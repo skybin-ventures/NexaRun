@@ -6,7 +6,7 @@
     {
       "name": "formfuse-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3001",
+      "arguments": "node_modules/next/dist/bin/next start -p 3101",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\FormFuse\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -16,13 +16,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3001"
+        "PORT": "3101"
       }
     },
     {
       "name": "seorender-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3004",
+      "arguments": "node_modules/next/dist/bin/next start -p 3104",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\seo-render\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -32,13 +32,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3004"
+        "PORT": "3104"
       }
     },
     {
       "name": "proquoter-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3005",
+      "arguments": "node_modules/next/dist/bin/next start -p 3105",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\ProQuoter\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -48,13 +48,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3005"
+        "PORT": "3105"
       }
     },
     {
       "name": "voxify-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3006",
+      "arguments": "node_modules/next/dist/bin/next start -p 3106",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\Voxify\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -64,13 +64,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3006"
+        "PORT": "3106"
       }
     },
     {
       "name": "deployra-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3007",
+      "arguments": "node_modules/next/dist/bin/next start -p 3107",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\Deployra\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -80,13 +80,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3007"
+        "PORT": "3107"
       }
     },
     {
       "name": "freshbond-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3008",
+      "arguments": "node_modules/next/dist/bin/next start -p 3108",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\FreshBond\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -96,13 +96,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3008"
+        "PORT": "3108"
       }
     },
     {
       "name": "minutely-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3009",
+      "arguments": "node_modules/next/dist/bin/next start -p 3109",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\Minutely\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -112,13 +112,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3009"
+        "PORT": "3109"
       }
     },
     {
       "name": "credhub-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3010",
+      "arguments": "node_modules/next/dist/bin/next start -p 3110",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\CredHub\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -128,13 +128,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3010"
+        "PORT": "3110"
       }
     },
     {
       "name": "vaulti-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3011",
+      "arguments": "node_modules/next/dist/bin/next start -p 3111",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\Vaulti\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -144,13 +144,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3011"
+        "PORT": "3111"
       }
     },
     {
       "name": "coshot-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3012",
+      "arguments": "node_modules/next/dist/bin/next start -p 3112",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\CoShot\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -160,13 +160,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3012"
+        "PORT": "3112"
       }
     },
     {
       "name": "skydrop-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3013",
+      "arguments": "node_modules/next/dist/bin/next start -p 3113",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\SkyDrop",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -176,13 +176,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3013"
+        "PORT": "3113"
       }
     },
     {
       "name": "aastha-ai-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3020",
+      "arguments": "node_modules/next/dist/bin/next start -p 3120",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\aastha-ai\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -192,13 +192,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3020"
+        "PORT": "3120"
       }
     },
     {
       "name": "skybin-company-website",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3002",
+      "arguments": "node_modules/next/dist/bin/next start -p 3102",
       "workingDirectory": "C:\\inetpub\\wwwroot\\skybin.co",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -208,13 +208,13 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3002"
+        "PORT": "3102"
       }
     },
     {
       "name": "skybin-producthub-website",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3003",
+      "arguments": "node_modules/next/dist/bin/next start -p 3103",
       "workingDirectory": "C:\\inetpub\\wwwroot\\skybin.io",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -224,7 +224,7 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3003"
+        "PORT": "3103"
       }
     }
   ]

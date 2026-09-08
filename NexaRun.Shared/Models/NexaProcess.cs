@@ -26,6 +26,6 @@ public class NexaProcess
     public Dictionary<string, string>? Environment { get; set; }
     public double? MaxCpuPercent { get; set; }
     public long? MaxMemoryMb { get; set; }
-    /// <summary>Optional URL opened from the Processes window (e.g. http://localhost:3001).</summary>
+    /// <summary>Optional URL opened from the Processes window (e.g. http://localhost:3101).</summary>
     public string? Url { get; set; }
 }
