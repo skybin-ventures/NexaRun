@@ -150,7 +150,7 @@
     {
       "name": "coshot-app",
       "script": "node",
-      "arguments": "node_modules/next/dist/bin/next start -p 3112",
+      "arguments": "node_modules/next/dist/bin/next start -p 3128",
       "workingDirectory": "C:\\repo\\SSC.Nebula\\CoShot\\frontend",
       "autoRestart": true,
       "maxRestartAttempts": 3,
@@ -160,7 +160,7 @@
       "logTimestamps": true,
       "environment": {
         "NODE_ENV": "production",
-        "PORT": "3112"
+        "PORT": "3128"
       }
     },
     {

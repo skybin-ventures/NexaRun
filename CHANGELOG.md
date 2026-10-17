@@ -1,5 +1,8 @@
-﻿# Changelog
+# Changelog
 
+
+## 2026-10-17
+- Bump Skyb.Framework package refs / drop Directory.Build.props; refresh nexarun-processes.json
 ## 2026-09-08
 - Point managed Next.js process ports and docs examples at the **31xx** frontend range (e.g. FormFuse 3101) to match PORTS.md
 

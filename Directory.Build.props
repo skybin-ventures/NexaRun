@@ -8,8 +8,5 @@
     <NuGetAudit>false</NuGetAudit>
     <NoWarn>$(NoWarn);NU1903</NoWarn>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1903</WarningsNotAsErrors>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)skybin.snk</AssemblyOriginatorKeyFile>
-    <DelaySign>false</DelaySign>
   </PropertyGroup>
 </Project>
