@@ -1,4 +1,5 @@
-# Manual patch release: bumps Directory.Build.props, builds the Windows installer, creates a GitHub Release.
+# Manual release: bumps Directory.Build.props (two-digit patch/minor rollover via Get-NextVersion.ps1),
+# builds the Windows installer, creates a GitHub Release.
 #
 # Required repository settings:
 #   - Actions enabled
@@ -32,7 +33,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute next patch version
+      - name: Compute next version
         id: version
         shell: pwsh
         run: |
@@ -43,13 +44,10 @@ jobs:
             throw "Could not find <Version> in $propsPath"
           }
           $current = $Matches[1].Trim()
-          if ($current -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
-            throw "Version '$current' is not major.minor.patch"
+          $new = (& .\installer\Get-NextVersion.ps1 -Version $current).Trim()
+          if ([string]::IsNullOrWhiteSpace($new)) {
+            throw "Get-NextVersion.ps1 returned an empty version"
           }
-          $major = [int]$Matches[1]
-          $minor = [int]$Matches[2]
-          $patch = [int]$Matches[3]
-          $new = "$major.$minor.$($patch + 1)"
           $tag = "v$new"
           Write-Host "Current version: $current → next: $new ($tag)"
           "current=$current" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8

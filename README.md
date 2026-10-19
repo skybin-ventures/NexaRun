@@ -46,7 +46,7 @@ Patch releases are created manually via GitHub Actions:
 
 1. Update the **latest** section in [`CHANGELOG.md`](CHANGELOG.md) with notes for this release (that section becomes the GitHub Release body).
 2. Open **Actions** → **Release installer** → **Run workflow** (on `main`).
-3. The workflow bumps the patch in `Directory.Build.props` (for example `1.0.10` → `1.0.11`), builds `NexaRun-<version>-Setup.exe`, labels the top changelog heading with `— v<version>`, commits both, and creates a GitHub Release tagged `v<version>` with the installer attached and notes from that changelog section.
+3. The workflow bumps the version in `Directory.Build.props` (patch and minor are two digits: `1.0.10` → `1.0.11`, `1.0.99` → `1.1.0`, `1.99.99` → `2.0.0`), builds `NexaRun-<version>-Setup.exe`, labels the top changelog heading with `— v<version>`, commits both, and creates a GitHub Release tagged `v<version>` with the installer attached and notes from that changelog section.
 4. Re-running after a successful release fails safely if that tag or release already exists.
 
 **Repository settings required**
