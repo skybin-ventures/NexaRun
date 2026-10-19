@@ -137,6 +137,7 @@ foreach ($e in $expected) {
     }
 }
 
+if (-not (Test-Path $OutDir)) { New-Item $OutDir -ItemType Directory | Out-Null }
 $PubDirResolved = (Resolve-Path $PubDir).Path -replace '\\', '/'
 $OutDirResolved = (Resolve-Path $OutDir).Path -replace '\\', '/'
 
@@ -169,8 +170,6 @@ Typical locations:
 "@
 }
 Write-Host "    ISCC: $ISCC" -ForegroundColor DarkGray
-
-if (-not (Test-Path $OutDir)) { New-Item $OutDir -ItemType Directory | Out-Null }
 
 Write-Host "==> Compiling installer..." -ForegroundColor Yellow
 Push-Location $PSScriptRoot
