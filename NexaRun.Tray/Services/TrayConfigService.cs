@@ -12,6 +12,15 @@ public class TrayConfigService(IpcClient ipc)
         return await SendImport(options, start);
     }
 
+    public async Task<(bool success, string message)> ImportFromPm2(bool start = false)
+    {
+        var result = Pm2LiveImport.ReadOnline();
+        var (ok, msg) = await SendImport(result.Options, start);
+        if (!ok)
+            return (false, msg);
+        return (true, $"{result.Summary}\n{msg}");
+    }
+
     public async Task<(bool success, string message)> ExportToFile(string path)
     {
         var response = await ipc.Send(new IpcRequest { Command = "list" });

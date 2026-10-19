@@ -25,11 +25,11 @@ public partial class MainWindow : Window
 
     private DataGrid _processGrid = null!;
     private Button _addBtn = null!, _refreshBtn = null!;
-    private MenuItem _importMenuItem = null!, _exportMenuItem = null!, _settingsMenuItem = null!, _clearAllMenuItem = null!;
+    private MenuItem _importMenuItem = null!, _importPm2MenuItem = null!, _exportMenuItem = null!, _settingsMenuItem = null!, _clearAllMenuItem = null!;
     private Button _startBtn = null!, _stopBtn = null!, _restartBtn = null!, _logsBtn = null!;
     private Button _editBtn = null!, _openUrlBtn = null!, _deleteBtn = null!;
     private Button _stopAllBtn = null!, _restartAllBtn = null!;
-    private Button _emptyAddBtn = null!, _emptyImportBtn = null!, _errorRetryBtn = null!;
+    private Button _emptyAddBtn = null!, _emptyImportBtn = null!, _emptyImportPm2Btn = null!, _errorRetryBtn = null!;
     private TextBox _searchBox = null!;
     private ComboBox _statusFilterBox = null!;
     private TextBlock _statusText = null!, _lastUpdatedText = null!, _errorStateText = null!;
@@ -49,6 +49,7 @@ public partial class MainWindow : Window
         _addBtn = this.FindControl<Button>("AddBtn")!;
         _refreshBtn = this.FindControl<Button>("RefreshBtn")!;
         _importMenuItem = this.FindControl<MenuItem>("ImportMenuItem")!;
+        _importPm2MenuItem = this.FindControl<MenuItem>("ImportPm2MenuItem")!;
         _exportMenuItem = this.FindControl<MenuItem>("ExportMenuItem")!;
         _settingsMenuItem = this.FindControl<MenuItem>("SettingsMenuItem")!;
         _clearAllMenuItem = this.FindControl<MenuItem>("ClearAllMenuItem")!;
@@ -63,6 +64,7 @@ public partial class MainWindow : Window
         _restartAllBtn = this.FindControl<Button>("RestartAllBtn")!;
         _emptyAddBtn = this.FindControl<Button>("EmptyAddBtn")!;
         _emptyImportBtn = this.FindControl<Button>("EmptyImportBtn")!;
+        _emptyImportPm2Btn = this.FindControl<Button>("EmptyImportPm2Btn")!;
         _errorRetryBtn = this.FindControl<Button>("ErrorRetryBtn")!;
         _searchBox = this.FindControl<TextBox>("SearchBox")!;
         _statusFilterBox = this.FindControl<ComboBox>("StatusFilterBox")!;
@@ -90,7 +92,9 @@ public partial class MainWindow : Window
         _refreshBtn.Click += async (_, _) => await Refresh(preserveSelection: true);
         _errorRetryBtn.Click += async (_, _) => await Refresh(preserveSelection: true);
         _importMenuItem.Click += async (_, _) => await TrayImportExportActions.ImportFromPicker(this, _config, () => Refresh(preserveSelection: true));
+        _importPm2MenuItem.Click += async (_, _) => await TrayImportExportActions.ImportFromPm2(this, _config, () => Refresh(preserveSelection: true));
         _emptyImportBtn.Click += async (_, _) => await TrayImportExportActions.ImportFromPicker(this, _config, () => Refresh(preserveSelection: true));
+        _emptyImportPm2Btn.Click += async (_, _) => await TrayImportExportActions.ImportFromPm2(this, _config, () => Refresh(preserveSelection: true));
         _exportMenuItem.Click += async (_, _) => await TrayImportExportActions.ExportToPicker(this, _config);
         _clearAllMenuItem.Click += async (_, _) => await ConfirmClearAll();
         _settingsMenuItem.Click += async (_, _) => await OpenSettings();

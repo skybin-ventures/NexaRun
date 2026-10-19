@@ -133,6 +133,20 @@ jobs:
           }
           Write-Host "Installer ready: $setup ($([math]::Round((Get-Item $setup).Length/1MB, 2)) MB)"
 
+      - name: Prepare CHANGELOG release notes
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\installer\Get-ChangelogNotes.ps1 `
+            -Version $env:NEW_VERSION `
+            -UpdateHeading `
+            -OutFile release-notes.md
+          if (-not (Test-Path release-notes.md)) {
+            throw "release-notes.md was not written"
+          }
+
       - name: Commit version bump
         id: commit
         env:
@@ -142,7 +156,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Directory.Build.props
+          git add Directory.Build.props CHANGELOG.md
           git commit -m "chore: bump version to $env:NEW_VERSION"
           git push origin "HEAD:$env:GITHUB_REF_NAME"
           $sha = git rev-parse HEAD
@@ -163,6 +177,9 @@ jobs:
           if (-not (Test-Path $setup)) {
             throw "Installer missing before release: $setup"
           }
+          if (-not (Test-Path release-notes.md)) {
+            throw "release-notes.md missing before release create"
+          }
           # Re-check immediately before create (race / partial prior run)
           $remoteTags = git ls-remote --tags origin "refs/tags/$env:TAG"
           if ($remoteTags) {
@@ -175,9 +192,9 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           gh release create $env:TAG $setup `
             --title "NexaRun $env:NEW_VERSION" `
-            --generate-notes `
+            --notes-file release-notes.md `
             --target $env:TARGET_SHA
           if ($LASTEXITCODE -ne 0) {
             throw "gh release create failed (exit $LASTEXITCODE)"
           }
-          Write-Host "Created release $env:TAG with $setup"
+          Write-Host "Created release $env:TAG with $setup (notes from CHANGELOG.md)"

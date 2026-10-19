@@ -3,7 +3,9 @@
 ## 2026-10-19
 - Release: single version source in `Directory.Build.props`; `installer\build.ps1` reads it and passes MSBuild + Inno versions; `.iss` requires `/DAppVersion`
 - CI: manual `Release installer` workflow bumps patch, builds Windows setup, creates `v*` GitHub Release with the installer attached
+- CI: release body comes from the latest `CHANGELOG.md` section (`installer\Get-ChangelogNotes.ps1`); top heading is labeled `— vX.Y.Z` and committed with the version bump
 - Docs: README Releasing section (Actions trigger + required workflow permissions / branch-protection notes)
+- Feature: import currently online PM2 apps (`nexarun import --from-pm2`, tray **Import from PM2…**); enriches from `dump.pm2` when present; register-only by default
 - Lifecycle: fix PID reattach on daemon Load (preserve + fingerprint); DesiredStatus boot restore; monitor AutoRestart=false exits; cancel crash-restart on user stop; soft-then-force stop (8s); data dir `%ProgramData%\NexaRun`; pipe ACL for Interactive users
 - CLI: script-path `start`, incremental `logs --follow`, `describe` / `history` / `save` / `resurrect` / `daemon status` / `stop all` / `delete all`; exit codes 2/3; settle defaults 2s; PM2 JSON field subset on import
 - Tray: Processes window search/status filter, empty/error states, scroll-preserving refresh; shared log viewer; soft-then-force stop UX across dialogs

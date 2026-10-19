@@ -44,9 +44,10 @@ To build the installer from source: run `installer\generate-icon.ps1` then `inst
 
 Patch releases are created manually via GitHub Actions:
 
-1. Open **Actions** → **Release installer** → **Run workflow** (on `main`).
-2. The workflow bumps the patch in `Directory.Build.props` (for example `1.0.10` → `1.0.11`), builds `NexaRun-<version>-Setup.exe`, commits the bump, and creates a GitHub Release tagged `v<version>` with the installer attached.
-3. Re-running after a successful release fails safely if that tag or release already exists.
+1. Update the **latest** section in [`CHANGELOG.md`](CHANGELOG.md) with notes for this release (that section becomes the GitHub Release body).
+2. Open **Actions** → **Release installer** → **Run workflow** (on `main`).
+3. The workflow bumps the patch in `Directory.Build.props` (for example `1.0.10` → `1.0.11`), builds `NexaRun-<version>-Setup.exe`, labels the top changelog heading with `— v<version>`, commits both, and creates a GitHub Release tagged `v<version>` with the installer attached and notes from that changelog section.
+4. Re-running after a successful release fails safely if that tag or release already exists.
 
 **Repository settings required**
 
@@ -92,10 +93,11 @@ Click the NexaRun icon in the system tray to get started. Right-click for the me
 | Menu item | Action |
 |---|---|
 | **Import JSON…** | Pick a `.json` file and register processes (does not start them; use Start in Processes) |
+| **Import from PM2…** | Register currently online PM2 apps (definitions only; stop PM2 before Start to avoid duplicates) |
 | **Settings…** | Recovery interval, AWS SES email (API or SMTP), From/To addresses |
 | **Add Process → Import JSON…** | Same import from the Add Process window |
 | **Export JSON…** | Save definitions for another machine |
-| **Processes window** | **Import JSON** / **Export JSON** toolbar buttons (same as tray) |
+| **Processes window** | **Import JSON** / **Import from PM2** / **Export JSON** (same as tray) |
 | **Open data folder** | Opens `%ProgramData%\NexaRun` |
 
 ### Processes Window
@@ -194,14 +196,16 @@ nexarun start python --name bot --args "app.py" --cwd "C:\Projects\bot"
 
 ### `nexarun import`
 
-Import one or more processes from a JSON file. See [Process JSON](#process-json-nexarun-processesjson) below.
+Import processes from a JSON file or from currently online PM2 apps. See [Process JSON](#process-json-nexarun-processesjson) below.
 
 ```powershell
 nexarun import <file.json> [options]
+nexarun import --from-pm2 [options]
 ```
 
 | Option | Description |
 |--------|-------------|
+| `--from-pm2` | Import online PM2 apps (`pm2 jlist` + optional `dump.pm2` enrichment) |
 | `--only <name>` | Import only this app name |
 | `--start` | Start processes after importing them |
 
@@ -209,6 +213,8 @@ nexarun import <file.json> [options]
 nexarun import nexarun-processes.json
 nexarun import C:\deploy\processes.json --only api
 nexarun import nexarun-processes.json --start
+nexarun import --from-pm2
+nexarun import --from-pm2 --only api
 ```
 
 ### `nexarun list`
@@ -334,6 +340,8 @@ Import/export uses **JSON only** (`nexarun-processes.json`). Example in the repo
 | `url` | Optional link opened via **Open URL** in the Processes window |
 
 **PM2 ecosystem subset:** when importing JSON you may also use `args`, `cwd`, `env`, `max_restarts`, `autorestart`, `error_file`, `out_file`, `log_file`. Unsupported: `instances`, `exec_mode`, `watch`, `cron_restart`, and `.js` ecosystem files.
+
+**Import live PM2 apps:** `nexarun import --from-pm2` (or tray **Import from PM2…**) reads online processes via `pm2 jlist` and prefers saved definitions from `dump.pm2` when available. Registers only (use `--start` or Start in Processes explicitly). Requires `pm2` on PATH for the user running the CLI/tray. Cluster/`instances`, watch, and cron are not imported as NexaRun features.
 
 ---
 

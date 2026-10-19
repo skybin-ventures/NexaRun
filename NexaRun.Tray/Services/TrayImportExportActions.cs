@@ -32,6 +32,31 @@ public static class TrayImportExportActions
         await ImportFile(owner, config, path, onSuccess);
     }
 
+    public static async Task ImportFromPm2(Window? owner, TrayConfigService config, Func<Task>? onSuccess = null)
+    {
+        var confirmed = await ConfirmDialog.Show(
+            owner,
+            "Import from PM2",
+            "Register currently online PM2 apps in NexaRun without starting them.\n\n" +
+            "Stop those apps in PM2 (or stop PM2) before starting them here, or you may run duplicates on the same ports.",
+            "Import");
+
+        if (!confirmed)
+            return;
+
+        try
+        {
+            var (ok, msg) = await config.ImportFromPm2(start: false);
+            await MessageDialog.Show(owner, ok ? "Import complete" : "Import failed", msg);
+            if (ok && onSuccess != null)
+                await onSuccess();
+        }
+        catch (Exception ex)
+        {
+            await MessageDialog.Show(owner, "Import failed", ex.Message);
+        }
+    }
+
     public static async Task ExportToPicker(Window? owner, TrayConfigService config)
     {
         var defaultName = $"nexarun-processes-{DateTime.Now:yyyyMMdd-HHmmss}.json";

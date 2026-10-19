@@ -28,6 +28,7 @@
           <Button.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft">
               <MenuItem x:Name="ImportMenuItem" Header="Import JSON…" />
+              <MenuItem x:Name="ImportPm2MenuItem" Header="Import from PM2…" />
               <MenuItem x:Name="ExportMenuItem" Header="Export JSON…" />
               <MenuItem x:Name="SettingsMenuItem" Header="Settings…" />
               <Separator />
@@ -117,6 +118,7 @@
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0 8 0 0">
             <Button x:Name="EmptyAddBtn" Content="Add Process" Classes="accent" />
             <Button x:Name="EmptyImportBtn" Content="Import JSON…" />
+            <Button x:Name="EmptyImportPm2Btn" Content="Import from PM2…" />
           </StackPanel>
         </StackPanel>
       </Border>

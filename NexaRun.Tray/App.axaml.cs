@@ -61,6 +61,7 @@ public class App : Application
         AddMenuItem(menu, "Dashboard", (_, _) => ShowDashboard());
         AddMenuItem(menu, "Add Process", (_, _) => ShowAddProcess());
         AddMenuItem(menu, "Import JSON...", async (_, _) => await ImportJson());
+        AddMenuItem(menu, "Import from PM2...", async (_, _) => await ImportPm2());
         AddMenuItem(menu, "Export JSON...", async (_, _) => await ExportJson());
         AddMenuItem(menu, "Settings...", (_, _) => ShowSettings());
 
@@ -101,13 +102,19 @@ public class App : Application
     private async Task ImportJson()
     {
         if (_config == null) return;
-        await TrayImportExportActions.ImportFromPicker(_mainWindow, _config, RefreshMainWindow);
+        await TrayImportExportActions.ImportFromPicker(VisibleOwner(), _config, RefreshMainWindow);
+    }
+
+    private async Task ImportPm2()
+    {
+        if (_config == null) return;
+        await TrayImportExportActions.ImportFromPm2(VisibleOwner(), _config, RefreshMainWindow);
     }
 
     private async Task ExportJson()
     {
         if (_config == null) return;
-        await TrayImportExportActions.ExportToPicker(_mainWindow, _config);
+        await TrayImportExportActions.ExportToPicker(VisibleOwner(), _config);
     }
 
     private static void OpenDataFolder()
