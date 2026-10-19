@@ -1,58 +1,59 @@
 # Generates installer/assets/NexaRun.ico (PNG entries — valid for Inno Setup + Windows)
 $ErrorActionPreference = "Stop"
-Add-Type -AssemblyName System.Drawing
 
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
+# PowerShell 7+: Bitmap/Icon live in System.Drawing.Common (System.Drawing is a facade).
+Add-Type -AssemblyName System.Drawing.Common
 
-public static class NexaRunIcoWriter
-{
-    public static void SavePngIcon(string path, IList<Bitmap> images)
-    {
-        var pngs = new List<byte[]>(images.Count);
-        foreach (var img in images)
-        {
-            using (var ms = new MemoryStream())
-            {
-                img.Save(ms, ImageFormat.Png);
-                pngs.Add(ms.ToArray());
-            }
+function Save-PngIcon {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][System.Drawing.Bitmap[]]$Images
+    )
+
+    $pngs = [System.Collections.Generic.List[byte[]]]::new($Images.Length)
+    foreach ($img in $Images) {
+        $ms = [System.IO.MemoryStream]::new()
+        try {
+            $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+            $pngs.Add($ms.ToArray())
         }
-
-        using (var fs = File.Create(path))
-        using (var bw = new BinaryWriter(fs))
-        {
-            bw.Write((short)0);
-            bw.Write((short)1);
-            bw.Write((short)pngs.Count);
-
-            int offset = 6 + (16 * pngs.Count);
-            for (int i = 0; i < images.Count; i++)
-            {
-                var img = images[i];
-                int w = img.Width;
-                int h = img.Height;
-                bw.Write((byte)(w >= 256 ? 0 : w));
-                bw.Write((byte)(h >= 256 ? 0 : h));
-                bw.Write((byte)0);
-                bw.Write((byte)0);
-                bw.Write((short)1);
-                bw.Write((short)32);
-                bw.Write(pngs[i].Length);
-                bw.Write(offset);
-                offset += pngs[i].Length;
-            }
-
-            foreach (var png in pngs)
-                bw.Write(png);
+        finally {
+            $ms.Dispose()
         }
     }
+
+    $fs = [System.IO.File]::Create($Path)
+    $bw = [System.IO.BinaryWriter]::new($fs)
+    try {
+        $bw.Write([int16]0)
+        $bw.Write([int16]1)
+        $bw.Write([int16]$pngs.Count)
+
+        $offset = 6 + (16 * $pngs.Count)
+        for ($i = 0; $i -lt $Images.Length; $i++) {
+            $img = $Images[$i]
+            $w = $img.Width
+            $h = $img.Height
+            $bw.Write([byte]($(if ($w -ge 256) { 0 } else { $w })))
+            $bw.Write([byte]($(if ($h -ge 256) { 0 } else { $h })))
+            $bw.Write([byte]0)
+            $bw.Write([byte]0)
+            $bw.Write([int16]1)
+            $bw.Write([int16]32)
+            $bw.Write([int]$pngs[$i].Length)
+            $bw.Write([int]$offset)
+            $offset += $pngs[$i].Length
+        }
+
+        foreach ($png in $pngs) {
+            $bw.Write($png)
+        }
+    }
+    finally {
+        $bw.Dispose()
+        $fs.Dispose()
+    }
 }
-"@
 
 function New-NexaRunBitmap([int]$size) {
     $bmp = New-Object System.Drawing.Bitmap $size, $size
@@ -76,12 +77,12 @@ $out = Join-Path $PSScriptRoot "assets\NexaRun.ico"
 $dir = Split-Path $out -Parent
 if (-not (Test-Path $dir)) { New-Item $dir -ItemType Directory | Out-Null }
 
-$bitmaps = New-Object 'System.Collections.Generic.List[System.Drawing.Bitmap]'
+$bitmaps = [System.Collections.Generic.List[System.Drawing.Bitmap]]::new()
 try {
     foreach ($s in @(16, 32, 48, 64, 256)) {
         $bitmaps.Add((New-NexaRunBitmap $s))
     }
-    [NexaRunIcoWriter]::SavePngIcon($out, $bitmaps)
+    Save-PngIcon -Path $out -Images $bitmaps.ToArray()
 }
 finally {
     foreach ($bmp in $bitmaps) { $bmp.Dispose() }

@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-19
+- CI: generate installer icon under PowerShell 7 via `System.Drawing.Common` (no C# `Add-Type` that failed on GitHub Actions)
 - CI: fix Release installer guard step exiting 1 after a successful “no tag/release” check (leftover pwsh `$LASTEXITCODE`)
 - Release: single version source in `Directory.Build.props`; `installer\build.ps1` reads it and passes MSBuild + Inno versions; `.iss` requires `/DAppVersion`
 - CI: manual `Release installer` workflow bumps patch, builds Windows setup, creates `v*` GitHub Release with the installer attached
