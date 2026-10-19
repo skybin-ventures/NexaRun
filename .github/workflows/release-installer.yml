@@ -77,6 +77,8 @@ jobs:
             throw "GitHub Release $env:TAG already exists. Refusing to recreate or overwrite."
           }
           Write-Host "No existing tag or release for $env:TAG — proceeding."
+          # Missing tag/release leaves LASTEXITCODE != 0; pwsh would otherwise fail the step.
+          exit 0
 
       - name: Bump Directory.Build.props
         env:

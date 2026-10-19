@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-19
+- CI: fix Release installer guard step exiting 1 after a successful “no tag/release” check (leftover pwsh `$LASTEXITCODE`)
 - Release: single version source in `Directory.Build.props`; `installer\build.ps1` reads it and passes MSBuild + Inno versions; `.iss` requires `/DAppVersion`
 - CI: manual `Release installer` workflow bumps patch, builds Windows setup, creates `v*` GitHub Release with the installer attached
 - CI: release body comes from the latest `CHANGELOG.md` section (`installer\Get-ChangelogNotes.ps1`); top heading is labeled `— vX.Y.Z` and committed with the version bump
