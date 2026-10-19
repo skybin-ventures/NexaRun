@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-19
+## 2026-10-19 — v1.0.11
 - CI: create `installer\output` before resolving its path in `build.ps1` (fresh CI checkout has no output dir)
 - CI: generate installer icon under PowerShell 7 via `System.Drawing.Common` (no C# `Add-Type` that failed on GitHub Actions)
 - CI: fix Release installer guard step exiting 1 after a successful “no tag/release” check (leftover pwsh `$LASTEXITCODE`)
