@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-10-19
+- Release: single version source in `Directory.Build.props`; `installer\build.ps1` reads it and passes MSBuild + Inno versions; `.iss` requires `/DAppVersion`
+- CI: manual `Release installer` workflow bumps patch, builds Windows setup, creates `v*` GitHub Release with the installer attached
+- Docs: README Releasing section (Actions trigger + required workflow permissions / branch-protection notes)
 - Lifecycle: fix PID reattach on daemon Load (preserve + fingerprint); DesiredStatus boot restore; monitor AutoRestart=false exits; cancel crash-restart on user stop; soft-then-force stop (8s); data dir `%ProgramData%\NexaRun`; pipe ACL for Interactive users
 - CLI: script-path `start`, incremental `logs --follow`, `describe` / `history` / `save` / `resurrect` / `daemon status` / `stop all` / `delete all`; exit codes 2/3; settle defaults 2s; PM2 JSON field subset on import
 - Tray: Processes window search/status filter, empty/error states, scroll-preserving refresh; shared log viewer; soft-then-force stop UX across dialogs

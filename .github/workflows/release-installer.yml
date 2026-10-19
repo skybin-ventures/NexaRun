@@ -1,0 +1,183 @@
+# Manual patch release: bumps Directory.Build.props, builds the Windows installer, creates a GitHub Release.
+#
+# Required repository settings:
+#   - Actions enabled
+#   - Settings → Actions → General → Workflow permissions → Read and write
+#     (needed so GITHUB_TOKEN can push the version bump and create the release)
+#   - If main is protected against bot pushes: allow github-actions[bot] to bypass,
+#     or replace checkout/push with a fine-scoped PAT (RELEASE_TOKEN) that can bypass
+#   - workflow_dispatch requires write access to the repository
+#
+# Permissions used: contents: write only (commit, tag, release, upload asset).
+
+name: Release installer
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-installer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute next patch version
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $propsPath = "Directory.Build.props"
+          $raw = Get-Content -Path $propsPath -Raw
+          if ($raw -notmatch '<Version>([^<]+)</Version>') {
+            throw "Could not find <Version> in $propsPath"
+          }
+          $current = $Matches[1].Trim()
+          if ($current -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
+            throw "Version '$current' is not major.minor.patch"
+          }
+          $major = [int]$Matches[1]
+          $minor = [int]$Matches[2]
+          $patch = [int]$Matches[3]
+          $new = "$major.$minor.$($patch + 1)"
+          $tag = "v$new"
+          Write-Host "Current version: $current → next: $new ($tag)"
+          "current=$current" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "new=$new" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Fail if tag or release already exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # Native gh/git non-zero exits must not abort before we inspect $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $false
+          $remoteTags = git ls-remote --tags origin "refs/tags/$env:TAG"
+          if ($remoteTags) {
+            throw "Tag $env:TAG already exists on origin. Refusing to create a conflicting release."
+          }
+          git rev-parse "refs/tags/$env:TAG" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Tag $env:TAG already exists locally. Refusing to create a conflicting release."
+          }
+          gh release view $env:TAG 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "GitHub Release $env:TAG already exists. Refusing to recreate or overwrite."
+          }
+          Write-Host "No existing tag or release for $env:TAG — proceeding."
+
+      - name: Bump Directory.Build.props
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $propsPath = "Directory.Build.props"
+          $raw = Get-Content -Path $propsPath -Raw
+          $updated = [regex]::Replace(
+            $raw,
+            '<Version>[^<]+</Version>',
+            "<Version>$env:NEW_VERSION</Version>",
+            1
+          )
+          if ($updated -eq $raw) {
+            throw "Failed to bump <Version> in $propsPath"
+          }
+          Set-Content -Path $propsPath -Value $updated -NoNewline
+          Write-Host "Bumped Version to $env:NEW_VERSION"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install innosetup --no-progress -y
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
+          )
+          $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $found) {
+            throw "ISCC.exe not found after installing Inno Setup"
+          }
+          Write-Host "ISCC: $found"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\installer\build.ps1
+          $setup = "installer\output\NexaRun-${{ steps.version.outputs.new }}-Setup.exe"
+          if (-not (Test-Path $setup)) {
+            throw "Expected installer not found: $setup"
+          }
+          Write-Host "Installer ready: $setup ($([math]::Round((Get-Item $setup).Length/1MB, 2)) MB)"
+
+      - name: Commit version bump
+        id: commit
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          git commit -m "chore: bump version to $env:NEW_VERSION"
+          git push origin "HEAD:$env:GITHUB_REF_NAME"
+          $sha = git rev-parse HEAD
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Pushed version bump commit $sha"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TARGET_SHA: ${{ steps.commit.outputs.sha }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $setup = "installer\output\NexaRun-$env:NEW_VERSION-Setup.exe"
+          if (-not (Test-Path $setup)) {
+            throw "Installer missing before release: $setup"
+          }
+          # Re-check immediately before create (race / partial prior run)
+          $remoteTags = git ls-remote --tags origin "refs/tags/$env:TAG"
+          if ($remoteTags) {
+            throw "Tag $env:TAG appeared before release create. Refusing to overwrite."
+          }
+          gh release view $env:TAG 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $env:TAG appeared before create. Refusing to overwrite."
+          }
+          $PSNativeCommandUseErrorActionPreference = $true
+          gh release create $env:TAG $setup `
+            --title "NexaRun $env:NEW_VERSION" `
+            --generate-notes `
+            --target $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) {
+            throw "gh release create failed (exit $LASTEXITCODE)"
+          }
+          Write-Host "Created release $env:TAG with $setup"

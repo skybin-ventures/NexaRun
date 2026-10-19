@@ -5,7 +5,7 @@
 ; Do NOT point PubDir at bin\Debug or bin\Release under each project — only installer\publish.
 
 #ifndef AppVersion
-  #define AppVersion "1.0.10"
+  #error AppVersion must be passed via /DAppVersion=... (use installer\build.ps1)
 #endif
 #ifndef PubDir
   #define PubDir "publish"

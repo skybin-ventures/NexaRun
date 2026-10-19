@@ -3,19 +3,39 @@
 #
 # Usage (from repo root or installer/):
 #   .\installer\build.ps1
+#   .\installer\build.ps1 -Version 1.0.11
+#
+# Version defaults to <Version> in Directory.Build.props (single source of truth).
 #
 # Requirements:
 #   - .NET 10 SDK
 #   - Inno Setup 6 or 7 (ISCC.exe on PATH, or default install folder)
 
 param(
-    [string]$Version = "1.0.10",
+    [string]$Version = "",
     [string]$OutDir  = "$PSScriptRoot\output"
 )
 
 $ErrorActionPreference = "Stop"
 $Root    = Resolve-Path "$PSScriptRoot\.."
 $PubDir  = "$PSScriptRoot\publish"
+$PropsPath = Join-Path $Root "Directory.Build.props"
+
+function Get-VersionFromProps {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        throw "Directory.Build.props not found at $Path"
+    }
+    $raw = Get-Content -Path $Path -Raw
+    if ($raw -notmatch '<Version>([^<]+)</Version>') {
+        throw "Could not find <Version> in $Path"
+    }
+    return $Matches[1].Trim()
+}
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Get-VersionFromProps -Path $PropsPath
+}
 
 Write-Host "==> Building NexaRun $Version" -ForegroundColor Cyan
 
@@ -43,10 +63,16 @@ if ($svc -and $svc.Status -eq 'Running') {
 }
 
 Write-Host "==> Restoring + building solution (Release)..." -ForegroundColor Yellow
+$VersionProps = @(
+    "/p:Version=$Version",
+    "/p:AssemblyVersion=$Version.0",
+    "/p:FileVersion=$Version.0",
+    "/p:InformationalVersion=$Version"
+)
 $BuildProps = @(
     "/p:WarningsNotAsErrors=NU1903",
     "/p:NuGetAuditLevel=critical"
-)
+) + $VersionProps
 dotnet restore "$Root\NexaRun.slnx" @BuildProps
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet restore failed (exit $LASTEXITCODE). If you see NU1903, pull latest NexaRun/Directory.Build.props."
@@ -70,7 +96,7 @@ $PublishArgs = @(
     "/p:IncludeNativeLibrariesForSelfExtract=true",
     "/p:EnableCompressionInSingleFile=true",
     "/p:DebugType=none"
-)
+) + $VersionProps
 
 # Publish Daemon
 Write-Host "==> Publishing Daemon..." -ForegroundColor Yellow
@@ -134,7 +160,7 @@ function Find-Iscc {
 }
 
 $ISCC = Find-Iscc
-if (-not $ISCC) {
+if (-not ($ISCC)) {
     throw @"
 ISCC.exe not found. Install Inno Setup 6 or 7, or add its folder to PATH.
 Typical locations:

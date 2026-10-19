@@ -38,7 +38,21 @@ Until PATH works, use the full path:
 & "C:\Program Files\NexaRun\bin\nexarun.exe" list
 ```
 
-To build the installer from source: run `installer\generate-icon.ps1` then `installer\build.ps1` (requires Inno Setup 6).
+To build the installer from source: run `installer\generate-icon.ps1` then `installer\build.ps1` (requires Inno Setup 6). The app version is defined once in `Directory.Build.props`; `build.ps1` reads it and passes it to the installer.
+
+### Releasing
+
+Patch releases are created manually via GitHub Actions:
+
+1. Open **Actions** → **Release installer** → **Run workflow** (on `main`).
+2. The workflow bumps the patch in `Directory.Build.props` (for example `1.0.10` → `1.0.11`), builds `NexaRun-<version>-Setup.exe`, commits the bump, and creates a GitHub Release tagged `v<version>` with the installer attached.
+3. Re-running after a successful release fails safely if that tag or release already exists.
+
+**Repository settings required**
+
+- Actions enabled; workflow permissions set to **Read and write** (Settings → Actions → General) so `GITHUB_TOKEN` can push the version commit and create the release.
+- If `main` blocks bot pushes, allow `github-actions[bot]` to bypass branch protection (or use a fine-scoped PAT as `RELEASE_TOKEN` — not required when the default token can push).
+- Only users with write access can run `workflow_dispatch`.
 
 ---
 
