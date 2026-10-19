@@ -1,7 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using NexaRun.Shared.Ipc;
-using NexaRun.Shared.Models;
+using NexaRun.Tray.Services;
 
 namespace NexaRun.Tray.Views;
 
@@ -10,11 +11,13 @@ public partial class LogsWindow : Window
     private IpcClient _ipc = null!;
     private string _processName = "";
     private DispatcherTimer? _timer;
+    private TrayLogViewer _viewer = null!;
 
-    private TextBlock _titleText = null!;
-    private Button _refreshBtn = null!;
-    private Button _clearLogBtn = null!;
-    private CheckBox _autoScrollBox = null!;
+    private static readonly TimeSpan LiveInterval = TimeSpan.FromSeconds(2);
+
+    private TextBlock _titleText = null!, _errorBanner = null!;
+    private Button _refreshBtn = null!, _clearLogBtn = null!;
+    private CheckBox _autoScrollBox = null!, _liveUpdateBox = null!;
     private ScrollViewer _scroller = null!;
     private TextBox _logBox = null!;
 
@@ -28,66 +31,64 @@ public partial class LogsWindow : Window
         _ipc = ipc;
         _processName = processName;
 
-        _titleText    = this.FindControl<TextBlock>("TitleText")!;
-        _refreshBtn   = this.FindControl<Button>("RefreshBtn")!;
-        _clearLogBtn  = this.FindControl<Button>("ClearLogBtn")!;
-        _autoScrollBox= this.FindControl<CheckBox>("AutoScrollBox")!;
-        _scroller     = this.FindControl<ScrollViewer>("Scroller")!;
-        _logBox       = this.FindControl<TextBox>("LogBox")!;
+        _titleText = this.FindControl<TextBlock>("TitleText")!;
+        _errorBanner = this.FindControl<TextBlock>("ErrorBanner")!;
+        _refreshBtn = this.FindControl<Button>("RefreshBtn")!;
+        _clearLogBtn = this.FindControl<Button>("ClearLogBtn")!;
+        _autoScrollBox = this.FindControl<CheckBox>("AutoScrollBox")!;
+        _liveUpdateBox = this.FindControl<CheckBox>("LiveUpdateBox")!;
+        _scroller = this.FindControl<ScrollViewer>("Scroller")!;
+        _logBox = this.FindControl<TextBox>("LogBox")!;
 
         Title = $"Logs — {processName}";
         _titleText.Text = processName;
 
-        _refreshBtn.Click += async (_, _) => await Refresh();
-        _clearLogBtn.Click += async (_, _) => await ClearLog();
-        Opened  += async (_, _) => { await Refresh(); StartTimer(); };
+        _viewer = new TrayLogViewer(
+            _ipc,
+            () => _processName,
+            _logBox,
+            _scroller,
+            _autoScrollBox,
+            _errorBanner);
+
+        _refreshBtn.Click += async (_, _) => await _viewer.Refresh();
+        _clearLogBtn.Click += async (_, _) => await _viewer.ClearLogs(this);
+        _liveUpdateBox.IsCheckedChanged += (_, _) => UpdateTimer();
+
+        KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.F5)
+            {
+                e.Handled = true;
+                await _viewer.Refresh();
+            }
+        };
+
+        Opened += async (_, _) =>
+        {
+            await _viewer.Refresh();
+            StartTimer();
+        };
         Closing += (_, _) => _timer?.Stop();
     }
 
     private void StartTimer()
     {
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _timer.Tick += async (_, _) => await Refresh();
-        _timer.Start();
+        _timer = new DispatcherTimer { Interval = LiveInterval };
+        _timer.Tick += async (_, _) =>
+        {
+            if (_liveUpdateBox.IsChecked == true)
+                await _viewer.Refresh();
+        };
+        UpdateTimer();
     }
 
-    private async Task Refresh()
+    private void UpdateTimer()
     {
-        var response = await _ipc.Send(new IpcRequest
-        {
-            Command = "logs",
-            ProcessName = _processName,
-            LogLines = 200
-        });
-
-        if (!response.Success) return;
-
-        _logBox.Text = response.Logs ?? string.Empty;
-
-        if (_autoScrollBox.IsChecked == true)
-            _scroller.ScrollToEnd();
-    }
-
-    private async Task ClearLog()
-    {
-        var dlg = new ConfirmDialog(
-            $"Clear logs for '{_processName}'?",
-            "Deletes the on-disk log files for this process. New output will continue to be captured.");
-        var confirmed = await dlg.ShowDialog<bool>(this);
-        if (!confirmed) return;
-
-        var response = await _ipc.Send(new IpcRequest
-        {
-            Command = "clear-logs",
-            ProcessName = _processName
-        });
-
-        if (!response.Success)
-        {
-            _logBox.Text = response.Message;
-            return;
-        }
-
-        await Refresh();
+        if (_timer == null) return;
+        if (_liveUpdateBox.IsChecked == true)
+            _timer.Start();
+        else
+            _timer.Stop();
     }
 }

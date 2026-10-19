@@ -119,7 +119,7 @@ Filename: "powershell.exe"; \
   Flags: runhidden waituntilterminated; RunOnceId: "NexaRunTrayEventLogRemove"
 
 [UninstallDelete]
-; Leave %APPDATA%\NexaRun (user data) — only remove install dir
+; Leave %ProgramData%\NexaRun (shared daemon/CLI/tray data) — only remove install dir
 Type: filesandordirs; Name: "{app}"
 Type: files; Name: "{commonstartup}\NexaRun Tray.lnk"
 

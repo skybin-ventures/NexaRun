@@ -9,13 +9,14 @@ public partial class ConfirmDialog : Window
         InitializeComponent();
     }
 
-    public ConfirmDialog(string heading, string body) : this()
+    public ConfirmDialog(string heading, string body, string confirmLabel = "Confirm") : this()
     {
-
         Title = heading;
         this.FindControl<TextBlock>("HeadingText")!.Text = heading;
         this.FindControl<TextBlock>("BodyText")!.Text = body;
-        this.FindControl<Button>("ConfirmBtn")!.Click += (_, _) => Close(true);
-        this.FindControl<Button>("CancelBtn")!.Click  += (_, _) => Close(false);
+        var confirmBtn = this.FindControl<Button>("ConfirmBtn")!;
+        confirmBtn.Content = confirmLabel;
+        confirmBtn.Click += (_, _) => Close(true);
+        this.FindControl<Button>("CancelBtn")!.Click += (_, _) => Close(false);
     }
 }

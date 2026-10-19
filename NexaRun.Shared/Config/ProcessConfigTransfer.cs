@@ -84,6 +84,9 @@ public static class ProcessConfigTransfer
                 throw new InvalidOperationException($"No app named '{onlyApp}' in file.");
         }
 
+        foreach (var app in apps)
+            app.ApplyPm2Aliases();
+
         return apps.Select(ToStartOptions).ToList();
     }
 

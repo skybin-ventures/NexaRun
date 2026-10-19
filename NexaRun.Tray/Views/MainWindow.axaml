@@ -1,81 +1,146 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NexaRun.Tray.ViewModels"
         x:Class="NexaRun.Tray.Views.MainWindow"
         Title="NexaRun — Processes"
-        Width="780" Height="440"
-        MinWidth="600" MinHeight="300"
+        Width="780" Height="480"
+        MinWidth="600" MinHeight="320"
         WindowStartupLocation="CenterScreen">
 
   <DockPanel Margin="12">
 
     <!-- Toolbar -->
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0 0 0 10">
-      <Button x:Name="AddBtn">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconAdd}" />
-          <TextBlock Text="Add Process" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <Button x:Name="ImportBtn">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconDownload}" />
-          <TextBlock Text="Import JSON" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <Button x:Name="ExportBtn">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconUpload}" />
-          <TextBlock Text="Export JSON" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <Button x:Name="ClearAllBtn" Foreground="Salmon" IsEnabled="False" Content="Clear All" />
-      <Button x:Name="SettingsBtn">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconSettings}" />
-          <TextBlock Text="Settings" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <Button x:Name="RefreshBtn">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconRefresh}" />
-          <TextBlock Text="Refresh" VerticalAlignment="Center" />
-        </StackPanel>
-      </Button>
-      <TextBlock x:Name="StatusText" VerticalAlignment="Center" Foreground="Gray" FontSize="12" />
-    </StackPanel>
+    <DockPanel DockPanel.Dock="Top" Margin="0 0 0 8">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="AddBtn">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconAdd}" />
+            <TextBlock Text="Add Process" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="RefreshBtn">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Width="14" Height="14" Data="{StaticResource ToolbarIconRefresh}" />
+            <TextBlock Text="Refresh" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="MoreBtn" Content="More">
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem x:Name="ImportMenuItem" Header="Import JSON…" />
+              <MenuItem x:Name="ExportMenuItem" Header="Export JSON…" />
+              <MenuItem x:Name="SettingsMenuItem" Header="Settings…" />
+              <Separator />
+              <MenuItem x:Name="ClearAllMenuItem" Header="Clear All…" Classes="danger" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right"
+                  VerticalAlignment="Center">
+        <TextBox x:Name="SearchBox" PlaceholderText="Search name, URL, id…"
+                 Width="180" MinWidth="120" MaxWidth="240" />
+        <ComboBox x:Name="StatusFilterBox" Width="120" SelectedIndex="0">
+          <ComboBoxItem Content="All statuses" Tag="all" />
+          <ComboBoxItem Content="Online" Tag="Online" />
+          <ComboBoxItem Content="Stopped" Tag="Stopped" />
+          <ComboBoxItem Content="Errored" Tag="Errored" />
+          <ComboBoxItem Content="Starting" Tag="Starting" />
+          <ComboBoxItem Content="Stopping" Tag="Stopping" />
+        </ComboBox>
+      </StackPanel>
+    </DockPanel>
+
+    <TextBlock x:Name="StatusText" DockPanel.Dock="Top" Classes="statusMuted"
+               Margin="0 0 0 6" IsVisible="False" />
+    <TextBlock x:Name="LastUpdatedText" DockPanel.Dock="Top" Classes="statusMuted"
+               Margin="0 0 0 8" FontSize="11" />
 
     <!-- Action bar -->
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0 10 0 0">
-      <Button x:Name="StopAllBtn" Content="Stop All" IsEnabled="False" />
-      <Button x:Name="RestartAllBtn" Content="Restart All" IsEnabled="False" />
-      <Button x:Name="OpenUrlBtn" Content="Open URL" IsEnabled="False" />
-      <Button x:Name="StopBtn"    Content="Stop"    IsEnabled="False" />
-      <Button x:Name="RestartBtn" Content="Restart" IsEnabled="False" />
-      <Button x:Name="LogsBtn"    Content="Logs"    IsEnabled="False" />
-      <Button x:Name="EditBtn"    Content="Edit"    IsEnabled="False" />
-      <Button x:Name="DeleteBtn"  Content="Delete"  IsEnabled="False" Foreground="Salmon" />
-    </StackPanel>
+    <DockPanel DockPanel.Dock="Bottom" Margin="0 10 0 0">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="StartBtn" Content="Start" IsEnabled="False" />
+        <Button x:Name="StopBtn" Content="Stop" IsEnabled="False" />
+        <Button x:Name="RestartBtn" Content="Restart" IsEnabled="False" />
+        <Button x:Name="LogsBtn" Content="Logs" IsEnabled="False" />
+        <Separator Margin="4 0" />
+        <Button x:Name="EditBtn" Content="Edit" IsEnabled="False" />
+        <Button x:Name="OpenUrlBtn" Content="Open URL" IsEnabled="False" />
+        <Button x:Name="DeleteBtn" Content="Delete" IsEnabled="False" Classes="danger" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button x:Name="StopAllBtn" Content="Stop All" IsEnabled="False" />
+        <Button x:Name="RestartAllBtn" Content="Restart All" IsEnabled="False" />
+      </StackPanel>
+    </DockPanel>
 
-    <!-- Process grid -->
-    <DataGrid x:Name="ProcessGrid"
-              x:CompileBindings="False"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              SelectionMode="Single"
-              CanUserReorderColumns="False"
-              CanUserResizeColumns="True"
-              GridLinesVisibility="Horizontal">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Id"       Binding="{Binding Id}"       Width="40" />
-        <DataGridTextColumn Header="Name"     Binding="{Binding Name}"     Width="160" />
-        <DataGridTextColumn Header="URL"      Binding="{Binding Url}"      Width="140" />
-        <DataGridTextColumn Header="Status"   Binding="{Binding Status}"   Width="280" />
-        <DataGridTextColumn Header="PID"      Binding="{Binding Pid}"      Width="70" />
-        <DataGridTextColumn Header="Restarts" Binding="{Binding Restarts}" Width="70" />
-        <DataGridTextColumn Header="Memory"   Binding="{Binding Memory}"   Width="80" />
-        <DataGridTextColumn Header="Uptime"   Binding="{Binding Uptime}"   Width="70" />
-      </DataGrid.Columns>
-    </DataGrid>
+    <!-- Grid + overlays -->
+    <Grid>
+      <DataGrid x:Name="ProcessGrid"
+                x:CompileBindings="False"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                SelectionMode="Single"
+                CanUserReorderColumns="False"
+                CanUserResizeColumns="True"
+                GridLinesVisibility="Horizontal">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Id" Binding="{Binding Id}" Width="Auto" />
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" MinWidth="100" />
+          <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="*" MinWidth="80" />
+          <DataGridTemplateColumn Header="Status" Width="*" MinWidth="90">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ProcessRow">
+                <TextBlock Text="{Binding Status}"
+                           ToolTip.Tip="{Binding StatusTooltip}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="Auto" />
+          <DataGridTextColumn Header="CPU" Binding="{Binding Cpu}" Width="Auto" />
+          <DataGridTextColumn Header="Memory" Binding="{Binding Memory}" Width="Auto" />
+          <DataGridTextColumn Header="Uptime" Binding="{Binding Uptime}" Width="Auto" />
+          <DataGridTextColumn Header="Restarts" Binding="{Binding Restarts}" Width="Auto" />
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <Border x:Name="EmptyStatePanel" IsVisible="False"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="360">
+          <TextBlock Text="No processes yet" FontSize="18" FontWeight="SemiBold"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="Add an app to keep it running, or import a saved process list."
+                     Classes="statusMuted" TextAlignment="Center" HorizontalAlignment="Center" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0 8 0 0">
+            <Button x:Name="EmptyAddBtn" Content="Add Process" Classes="accent" />
+            <Button x:Name="EmptyImportBtn" Content="Import JSON…" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border x:Name="NoMatchesPanel" IsVisible="False"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <TextBlock Text="No matches for the current search or status filter."
+                   Classes="statusMuted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextAlignment="Center" Margin="24" />
+      </Border>
+
+      <Border x:Name="ErrorStatePanel" IsVisible="False"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="420">
+          <TextBlock Text="Cannot reach the NexaRun daemon" FontSize="16" FontWeight="SemiBold"
+                     HorizontalAlignment="Center" />
+          <TextBlock x:Name="ErrorStateText" Classes="errorText" TextAlignment="Center"
+                     HorizontalAlignment="Center" />
+          <Button x:Name="ErrorRetryBtn" Content="Retry" HorizontalAlignment="Center" Margin="0 8 0 0" />
+        </StackPanel>
+      </Border>
+    </Grid>
 
   </DockPanel>
 </Window>

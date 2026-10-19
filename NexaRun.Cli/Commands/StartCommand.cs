@@ -12,7 +12,7 @@ public static class StartCommand
     {
         var targetArg = new Argument<string>("target")
         {
-            Description = "Process id/name (start saved app) or executable (register and start new app)"
+            Description = "Process id/name (start saved app) or script/executable path (register and start)"
         };
 
         var nameOpt = new Option<string?>("--name")
@@ -70,18 +70,61 @@ public static class StartCommand
             Description = "Prefix log lines with timestamps"
         };
 
-        var cmd = new Command("start", "Start a process by id/name (PM2-style) or register a new executable")
+        var forwardArgs = new Argument<string[]>("appArgs")
+        {
+            Arity = ArgumentArity.ZeroOrMore,
+            Description = "Extra arguments forwarded to the executable (after --)"
+        };
+
+        var cmd = new Command("start", "Start a process by id/name (PM2-style) or register a new script/executable")
         {
             targetArg, nameOpt, argsOpt, cwdOpt, noRestartOpt,
-            maxRestartsOpt, maxCpuOpt, maxMemOpt, outLogOpt, errLogOpt, logOpt, timeOpt
+            maxRestartsOpt, maxCpuOpt, maxMemOpt, outLogOpt, errLogOpt, logOpt, timeOpt, forwardArgs
         };
 
         cmd.SetAction(async parseResult =>
         {
             var target = parseResult.GetValue(targetArg)!;
+            var forwarded = parseResult.GetValue(forwardArgs) ?? [];
+            var hasOptions = WantsNewExecutable(parseResult, argsOpt, cwdOpt, nameOpt, outLogOpt, errLogOpt, logOpt,
+                noRestartOpt, maxRestartsOpt, maxCpuOpt, maxMemOpt, timeOpt) || forwarded.Length > 0;
 
-            if (WantsNewExecutable(parseResult, argsOpt, cwdOpt, nameOpt, outLogOpt, errLogOpt, logOpt,
-                    noRestartOpt, maxRestartsOpt, maxCpuOpt, maxMemOpt, timeOpt))
+            // Ask daemon for current names when deciding existing vs new (best-effort).
+            var list = await client.Send(new IpcRequest { Command = "list" }, showProgress: false);
+            var names = list.Processes?.Select(p => p.Name).ToList() ?? [];
+            var idExists = (int id) => list.Processes?.Any(p => p.Id == id) == true;
+
+            var kind = StartTargetResolver.Resolve(target, hasOptions, names, idExists);
+
+            if (kind == StartTargetKind.NewExecutable ||
+                (kind == StartTargetKind.Existing && hasOptions && StartTargetResolver.LooksLikeExecutableOrScript(target)
+                 && !names.Any(n => n.Equals(target, StringComparison.Ordinal))
+                 && !(int.TryParse(target, out var tid) && idExists(tid))))
+            {
+                var name = parseResult.GetValue(nameOpt) ?? Path.GetFileNameWithoutExtension(target);
+                var args = parseResult.GetValue(argsOpt) ?? string.Empty;
+                if (forwarded.Length > 0)
+                {
+                    var joined = string.Join(' ', forwarded.Select(QuoteIfNeeded));
+                    args = string.IsNullOrWhiteSpace(args) ? joined : $"{args} {joined}";
+                }
+
+                return await StartNewAsync(client, name, target,
+                    args,
+                    parseResult.GetValue(cwdOpt) ?? string.Empty,
+                    !parseResult.GetValue(noRestartOpt),
+                    parseResult.GetValue(maxRestartsOpt),
+                    parseResult.GetValue(maxCpuOpt),
+                    parseResult.GetValue(maxMemOpt),
+                    parseResult.GetValue(outLogOpt),
+                    parseResult.GetValue(errLogOpt),
+                    parseResult.GetValue(logOpt),
+                    parseResult.GetValue(timeOpt));
+            }
+
+            if (StartTargetResolver.LooksLikeExecutableOrScript(target) &&
+                !names.Any(n => n.Equals(target, StringComparison.Ordinal)) &&
+                !(int.TryParse(target, out var id2) && idExists(id2)))
             {
                 var name = parseResult.GetValue(nameOpt) ?? Path.GetFileNameWithoutExtension(target);
                 return await StartNewAsync(client, name, target,
@@ -103,6 +146,9 @@ public static class StartCommand
 
         return cmd;
     }
+
+    private static string QuoteIfNeeded(string value) =>
+        value.Contains(' ') ? $"\"{value}\"" : value;
 
     private static bool WantsNewExecutable(
         ParseResult parseResult,

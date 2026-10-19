@@ -2,50 +2,79 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NexaRun.Tray.Views.AddProcessWindow"
         Title="Add Process"
-        Width="500" Height="460"
-        CanResize="False"
+        Width="520" Height="520"
+        MinWidth="420" MinHeight="360"
+        CanResize="True"
         WindowStartupLocation="CenterOwner">
 
-  <ScrollViewer>
-  <StackPanel Margin="20" Spacing="10">
-
-    <TextBlock Text="Name" />
-    <TextBox x:Name="NameBox" PlaceholderText="e.g. myapi" />
-
-    <TextBlock Text="Executable" />
-    <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="ExecBox" PlaceholderText="dotnet, node, ./app.exe …" />
-      <Button Grid.Column="1" x:Name="BrowseBtn" Content="…" Margin="6 0 0 0" />
-    </Grid>
-
-    <TextBlock Text="Arguments (optional)" />
-    <TextBox x:Name="ArgsBox" PlaceholderText="run --project ./MyApi" />
-
-    <TextBlock Text="Working Directory (optional)" />
-    <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="CwdBox" PlaceholderText="Defaults to current directory" />
-      <Button Grid.Column="1" x:Name="BrowseCwdBtn" Content="…" Margin="6 0 0 0" />
-    </Grid>
-
-    <CheckBox x:Name="AutoRestartBox" Content="Auto-restart on crash" IsChecked="True" Margin="0 4 0 0" />
-
-    <TextBlock Text="Max CPU % (optional — restart above this)" />
-    <TextBox x:Name="MaxCpuBox" PlaceholderText="e.g. 80" />
-
-    <TextBlock Text="Max Memory MB (optional — restart above this)" />
-    <TextBox x:Name="MaxMemBox" PlaceholderText="e.g. 512" />
-
-    <TextBlock Text="URL (optional — open in browser from Processes window)" />
-    <TextBox x:Name="UrlBox" PlaceholderText="e.g. http://localhost:3001" />
-
-    <TextBlock x:Name="ErrorText" Foreground="Salmon" FontSize="12" IsVisible="False" />
-
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0 8 0 0">
+  <DockPanel Margin="20">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                Spacing="8" Margin="0 12 0 0">
       <Button x:Name="ImportJsonBtn" Content="Import JSON…" />
-      <Button x:Name="CancelBtn" Content="Cancel" />
-      <Button x:Name="StartBtn"  Content="Save &amp; Start" />
+      <Button x:Name="CancelBtn" Content="Cancel" IsCancel="True" />
+      <Button x:Name="StartBtn" Content="Save &amp; Start" IsDefault="True" Classes="accent" />
     </StackPanel>
 
-  </StackPanel>
-  </ScrollViewer>
+    <TextBlock x:Name="ErrorText" DockPanel.Dock="Bottom" Classes="errorText"
+               IsVisible="False" Margin="0 0 0 8" />
+
+    <ScrollViewer>
+      <StackPanel Spacing="10">
+
+        <TextBlock Text="Name" />
+        <TextBox x:Name="NameBox" PlaceholderText="e.g. myapi"
+                 AutomationProperties.Name="Name" />
+        <TextBlock x:Name="NameHint" Classes="statusMuted" FontSize="11" IsVisible="False"
+                   Text="Name cannot be changed when editing." />
+
+        <TextBlock Text="Executable" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="ExecBox" PlaceholderText="dotnet, node, ./app.exe …"
+                   AutomationProperties.Name="Executable" />
+          <Button Grid.Column="1" x:Name="BrowseBtn" Content="…" Margin="6 0 0 0"
+                  AutomationProperties.Name="Browse for executable" />
+        </Grid>
+
+        <TextBlock Text="Arguments (optional)" />
+        <TextBox x:Name="ArgsBox" PlaceholderText="run --project ./MyApi"
+                 AutomationProperties.Name="Arguments" />
+
+        <TextBlock Text="Working Directory (optional)" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="CwdBox" PlaceholderText="Defaults to current directory"
+                   AutomationProperties.Name="Working Directory" />
+          <Button Grid.Column="1" x:Name="BrowseCwdBtn" Content="…" Margin="6 0 0 0"
+                  AutomationProperties.Name="Browse for working directory" />
+        </Grid>
+
+        <TextBlock Text="URL (optional — open in browser from Processes window)" />
+        <TextBox x:Name="UrlBox" PlaceholderText="e.g. http://localhost:3001"
+                 AutomationProperties.Name="URL" />
+
+        <CheckBox x:Name="AutoRestartBox" Content="Auto-restart on crash" IsChecked="True" Margin="0 4 0 0" />
+
+        <Expander Header="Limits &amp; logging" IsExpanded="False" Margin="0 4 0 0">
+          <StackPanel Spacing="10" Margin="0 8 0 0">
+            <TextBlock Text="Max CPU % (optional — restart above this)" />
+            <TextBox x:Name="MaxCpuBox" PlaceholderText="e.g. 80"
+                     AutomationProperties.Name="Max CPU percent" />
+            <TextBlock x:Name="MaxCpuError" Classes="errorText" IsVisible="False" />
+
+            <TextBlock Text="Max Memory MB (optional — restart above this)" />
+            <TextBox x:Name="MaxMemBox" PlaceholderText="e.g. 512"
+                     AutomationProperties.Name="Max Memory MB" />
+            <TextBlock x:Name="MaxMemError" Classes="errorText" IsVisible="False" />
+
+            <TextBlock Text="Max restart attempts" />
+            <TextBox x:Name="MaxRestartsBox" PlaceholderText="3"
+                     AutomationProperties.Name="Max restart attempts" />
+            <TextBlock x:Name="MaxRestartsError" Classes="errorText" IsVisible="False" />
+
+            <CheckBox x:Name="LogTimestampsBox" Content="Prefix log lines with timestamps" />
+          </StackPanel>
+        </Expander>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </Window>

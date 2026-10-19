@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NexaRun.Tray.Views.LogsWindow"
         Width="700" Height="500"
+        MinWidth="480" MinHeight="320"
         WindowStartupLocation="CenterScreen">
 
   <DockPanel Margin="12">
@@ -14,22 +15,29 @@
           <TextBlock Text="Refresh" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
-      <Button x:Name="ClearLogBtn" Content="Clear Log" Foreground="Salmon" />
+      <Button x:Name="ClearLogBtn" Content="Clear Log" Classes="danger" />
       <CheckBox x:Name="AutoScrollBox" Content="Auto-scroll" IsChecked="True" VerticalAlignment="Center" />
+      <CheckBox x:Name="LiveUpdateBox" Content="Live update" IsChecked="True" VerticalAlignment="Center" />
     </StackPanel>
 
-    <ScrollViewer x:Name="Scroller">
-      <TextBox x:Name="LogBox"
-               IsReadOnly="True"
-               AcceptsReturn="True"
-               FontFamily="Consolas,Menlo,monospace"
-               FontSize="12"
-               TextWrapping="NoWrap"
-               Background="#1e1e1e"
-               Foreground="#d4d4d4"
-               BorderThickness="0"
-               Padding="8" />
-    </ScrollViewer>
+    <TextBlock x:Name="ErrorBanner" DockPanel.Dock="Top" Classes="errorText"
+               IsVisible="False" Margin="0 0 0 8" />
+
+    <Border Background="#0a0a18" BorderBrush="#2a2a4a" BorderThickness="1" CornerRadius="4">
+      <ScrollViewer x:Name="Scroller">
+        <TextBox x:Name="LogBox"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 FontFamily="Consolas,Menlo,monospace"
+                 FontSize="12"
+                 TextWrapping="NoWrap"
+                 Background="#1e1e1e"
+                 Foreground="#d4d4d4"
+                 BorderThickness="0"
+                 Padding="8"
+                 AutomationProperties.Name="Process log output" />
+      </ScrollViewer>
+    </Border>
 
   </DockPanel>
 </Window>

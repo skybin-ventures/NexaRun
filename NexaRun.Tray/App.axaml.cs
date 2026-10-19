@@ -149,13 +149,32 @@ public class App : Application
         }
     }
 
-    private void ShowAddProcess()
+    private async void ShowAddProcess()
     {
-        new AddProcessWindow(_ipc).Show();
+        var dlg = new AddProcessWindow(_ipc);
+        var owner = VisibleOwner();
+        if (owner != null)
+            await dlg.ShowDialog(owner);
+        else
+            dlg.Show();
+
+        await RefreshMainWindow();
     }
 
-    private void ShowSettings()
+    private async void ShowSettings()
     {
-        new SettingsWindow(_ipc).Show();
+        var dlg = new SettingsWindow(_ipc);
+        var owner = VisibleOwner();
+        if (owner != null)
+            await dlg.ShowDialog(owner);
+        else
+            dlg.Show();
+    }
+
+    private Window? VisibleOwner()
+    {
+        if (_mainWindow?.IsVisible == true) return _mainWindow;
+        if (_dashboardWindow?.IsVisible == true) return _dashboardWindow;
+        return null;
     }
 }

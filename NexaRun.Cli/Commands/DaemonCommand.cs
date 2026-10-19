@@ -4,6 +4,9 @@ using NexaRun.Cli;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.ServiceProcess;
+using NexaRun.Shared;
+using NexaRun.Shared.Ipc;
+using NexaRun.Shared.Models;
 using Spectre.Console;
 
 namespace NexaRun.Cli.Commands;
@@ -12,7 +15,7 @@ public static class DaemonCommand
 {
     private const string ServiceName = "NexaRunDaemon";
 
-    public static Command Build()
+    public static Command Build(IpcClient client)
     {
         var startCmd = new Command("start", "Start the NexaRun daemon");
         startCmd.SetAction(async _ => await StartDaemonAsync());
@@ -20,10 +23,14 @@ public static class DaemonCommand
         var stopCmd = new Command("stop", "Stop the NexaRun daemon");
         stopCmd.SetAction(async _ => await StopDaemonAsync());
 
+        var statusCmd = new Command("status", "Show daemon service and pipe status");
+        statusCmd.SetAction(async _ => await StatusDaemonAsync(client));
+
         return new Command("daemon", "Control the NexaRun daemon service")
         {
             startCmd,
-            stopCmd
+            stopCmd,
+            statusCmd
         };
     }
 
@@ -32,6 +39,39 @@ public static class DaemonCommand
 
     private static Task<int> StopDaemonAsync() =>
         CliIpc.RunWithProgress("Stopping NexaRun daemon", () => Task.FromResult(StopDaemon()));
+
+    private static async Task<int> StatusDaemonAsync(IpcClient client)
+    {
+        var serviceStatus = "not installed / unknown";
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                using var sc = new ServiceController(ServiceName);
+                serviceStatus = sc.Status.ToString();
+            }
+            catch (InvalidOperationException)
+            {
+                serviceStatus = "not installed";
+            }
+            catch (Exception ex)
+            {
+                serviceStatus = $"error: {ex.Message}";
+            }
+        }
+
+        var pipe = await client.Send(new IpcRequest { Command = "daemon-info" }, showProgress: false);
+        var reachable = pipe.Success;
+        var dataDir = pipe.DataDir ?? NexaRunPaths.DataDir;
+
+        AnsiConsole.WriteLine($"Service ({ServiceName}): {serviceStatus}");
+        AnsiConsole.WriteLine($"Pipe reachable: {(reachable ? "yes" : "no")}");
+        AnsiConsole.WriteLine($"Data directory: {dataDir}");
+        if (!reachable && !string.IsNullOrWhiteSpace(pipe.Message))
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(pipe.Message)}[/]");
+
+        return reachable ? CliExitCodes.Success : CliExitCodes.DaemonUnreachable;
+    }
 
     private static int StartDaemon()
     {

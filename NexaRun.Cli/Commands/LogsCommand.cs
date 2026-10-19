@@ -30,7 +30,7 @@ public static class LogsCommand
 
         var followOpt = new Option<bool>("--follow")
         {
-            Description = "Stream logs continuously (tail -f style)"
+            Description = "Stream new log bytes continuously (Ctrl+C to exit)"
         };
 
         var cmd = new Command("logs", "Show process logs by id or name") { targetArg, linesOpt, outOpt, errOpt, followOpt };
@@ -65,18 +65,24 @@ public static class LogsCommand
         if (!response.Success)
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(response.Message)}[/]");
-            return 1;
+            return CliExitCodes.Failure;
         }
 
         AnsiConsole.WriteLine(response.Logs ?? string.Empty);
-        return 0;
+        return CliExitCodes.Success;
     }
 
     private static async Task<int> FollowLogs(IpcClient client, string target, int lines, string? stream)
     {
-        var lastLineCount = 0;
+        using var cts = new CancellationTokenSource();
+        ConsoleCancelEventHandler handler = (_, e) =>
+        {
+            e.Cancel = true;
+            cts.Cancel();
+        };
+        Console.CancelKeyPress += handler;
 
-        while (true)
+        try
         {
             var response = await client.Send(new IpcRequest
             {
@@ -89,20 +95,87 @@ public static class LogsCommand
             if (!response.Success)
             {
                 AnsiConsole.MarkupLine($"[red]{Markup.Escape(response.Message)}[/]");
-                return 1;
+                return CliExitCodes.Failure;
             }
 
-            var text = response.Logs ?? string.Empty;
-            var currentLines = text.Length == 0 ? 0 : text.Split('\n').Length;
-
-            if (currentLines != lastLineCount)
+            var path = response.LogPath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
-                Console.Clear();
-                AnsiConsole.WriteLine(text);
-                lastLineCount = currentLines;
+                AnsiConsole.WriteLine(response.Logs ?? "(no logs yet)");
+                AnsiConsole.MarkupLine("[yellow]Waiting for log file...[/]");
+            }
+            else
+            {
+                // Print the initial tail, then stream by byte offset.
+                AnsiConsole.WriteLine(response.Logs ?? string.Empty);
             }
 
-            await Task.Delay(1000);
+            long offset = 0;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                offset = new FileInfo(path).Length;
+            }
+
+            while (!cts.IsCancellationRequested)
+            {
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                {
+                    // Refresh path from daemon periodically until the file appears.
+                    var meta = await client.Send(new IpcRequest
+                    {
+                        Command = "logs",
+                        ProcessName = target,
+                        LogLines = 1,
+                        LogStream = stream
+                    }, showProgress: false);
+
+                    if (!meta.Success)
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(meta.Message)}[/]");
+                        return CliExitCodes.Failure;
+                    }
+
+                    path = meta.LogPath;
+                    await Task.Delay(1000, cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                    continue;
+                }
+
+                var info = new FileInfo(path);
+                if (info.Length < offset)
+                    offset = 0; // rotated or truncated
+
+                if (info.Length > offset)
+                {
+                    await using var fs = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite);
+                    fs.Seek(offset, SeekOrigin.Begin);
+                    using var reader = new StreamReader(fs);
+                    var chunk = await reader.ReadToEndAsync(cts.Token);
+                    if (!string.IsNullOrEmpty(chunk))
+                    {
+                        Console.Write(chunk);
+                        if (!chunk.EndsWith('\n') && !chunk.EndsWith('\r'))
+                            Console.WriteLine();
+                    }
+
+                    offset = fs.Position;
+                }
+
+                await Task.Delay(500, cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+
+            return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return CliExitCodes.Success;
+        }
+        finally
+        {
+            Console.CancelKeyPress -= handler;
         }
     }
 }

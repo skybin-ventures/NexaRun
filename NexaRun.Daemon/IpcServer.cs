@@ -1,5 +1,8 @@
 using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
+using NexaRun.Shared;
 using NexaRun.Shared.Ipc;
 using NexaRun.Shared.Models;
 
@@ -13,12 +16,7 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var pipe = new NamedPipeServerStream(
-                PipeConstants.PipeName,
-                PipeDirection.InOut,
-                NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
+            var pipe = CreatePipe();
 
             try
             {
@@ -28,6 +26,40 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
             catch (OperationCanceledException) { pipe.Dispose(); break; }
             catch (Exception ex) { logger.LogError(ex, "IPC accept error"); pipe.Dispose(); }
         }
+    }
+
+    private static NamedPipeServerStream CreatePipe()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return new NamedPipeServerStream(
+                PipeConstants.PipeName,
+                PipeDirection.InOut,
+                NamedPipeServerStream.MaxAllowedServerInstances,
+                PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous);
+        }
+
+        // Allow interactive users to connect when the daemon runs as LocalSystem.
+        var security = new PipeSecurity();
+        security.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+            AccessControlType.Allow));
+        security.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            PipeAccessRights.FullControl,
+            AccessControlType.Allow));
+
+        return NamedPipeServerStreamAcl.Create(
+            PipeConstants.PipeName,
+            PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous,
+            inBufferSize: 0,
+            outBufferSize: 0,
+            pipeSecurity: security);
     }
 
     private async Task HandleConnection(NamedPipeServerStream pipe, CancellationToken ct)
@@ -67,15 +99,21 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
                 "start" when !string.IsNullOrWhiteSpace(request.ProcessName) =>
                     await HandleStartExisting(request.ProcessName!),
                 "update" when request.Options != null => await HandleUpdate(request.Options),
+                "stop" when IsAllTarget(request.ProcessName) => await HandleStopAll(),
                 "stop" => await HandleStop(request.ProcessName),
                 "restart" => await HandleRestart(request.ProcessName, request.SettleAfterStart),
                 "restart-all" => await HandleRestartAll(),
+                "delete" when IsAllTarget(request.ProcessName) => await HandleDeleteAll(),
                 "delete" => await HandleDelete(request.ProcessName),
                 "clear-all" => await HandleClearAll(),
                 "list" => await HandleList(),
+                "describe" => await HandleDescribe(request.ProcessName),
                 "logs" => await HandleLogs(request.ProcessName, request.LogLines ?? 50, request.LogStream),
                 "clear-logs" => await HandleClearLogs(request.ProcessName),
                 "history" => await HandleHistory(request.ProcessName),
+                "save" => await HandleSave(),
+                "resurrect" => await HandleResurrect(),
+                "daemon-info" => await HandleDaemonInfo(),
                 "import" when request.BatchOptions != null => await HandleImport(request.BatchOptions, request.StartAfterImport),
                 "get-settings" => await HandleGetSettings(),
                 "set-settings" when request.Settings != null => await HandleSetSettings(request.Settings),
@@ -111,6 +149,9 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
         };
     }
 
+    private static bool IsAllTarget(string? target) =>
+        string.Equals(target, "all", StringComparison.OrdinalIgnoreCase);
+
     private async Task<IpcResponse> HandleStop(string? target)
     {
         if (string.IsNullOrWhiteSpace(target))
@@ -118,6 +159,51 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
         var (success, message) = await processManager.Stop(target);
         return new IpcResponse { Success = success, Message = message };
     }
+
+    private async Task<IpcResponse> HandleStopAll()
+    {
+        var (success, message) = await processManager.StopAll();
+        return new IpcResponse { Success = success, Message = message };
+    }
+
+    private async Task<IpcResponse> HandleDeleteAll()
+    {
+        var (success, message) = await processManager.DeleteAll();
+        return new IpcResponse { Success = success, Message = message };
+    }
+
+    private async Task<IpcResponse> HandleDescribe(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return new IpcResponse { Success = false, Message = "Process id or name required." };
+        var (success, message, process) = await processManager.Describe(target);
+        return new IpcResponse
+        {
+            Success = success,
+            Message = message,
+            Processes = process != null ? [process] : null
+        };
+    }
+
+    private async Task<IpcResponse> HandleSave()
+    {
+        var (success, message) = await processManager.Save();
+        return new IpcResponse { Success = success, Message = message, DataDir = NexaRunPaths.DataDir };
+    }
+
+    private async Task<IpcResponse> HandleResurrect()
+    {
+        var (success, message) = await processManager.Resurrect();
+        return new IpcResponse { Success = success, Message = message };
+    }
+
+    private Task<IpcResponse> HandleDaemonInfo() =>
+        Task.FromResult(new IpcResponse
+        {
+            Success = true,
+            Message = "Daemon is reachable.",
+            DataDir = NexaRunPaths.DataDir
+        });
 
     private async Task<IpcResponse> HandleRestart(string? target, bool settleAfterStart)
     {
@@ -171,8 +257,14 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
             _ => LogStream.Combined
         };
 
-        var (success, body) = await processManager.GetLogs(target, lines, logStream);
-        return new IpcResponse { Success = success, Message = success ? string.Empty : body, Logs = success ? body : null };
+        var (success, body, logPath) = await processManager.GetLogs(target, lines, logStream);
+        return new IpcResponse
+        {
+            Success = success,
+            Message = success ? string.Empty : body,
+            Logs = success ? body : null,
+            LogPath = logPath
+        };
     }
 
     private async Task<IpcResponse> HandleClearLogs(string? target)

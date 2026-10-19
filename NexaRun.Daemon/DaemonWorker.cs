@@ -7,6 +7,8 @@ public class DaemonWorker(ProcessManager processManager, ILogger<DaemonWorker> l
         logger.LogInformation("NexaRun daemon starting");
         await processManager.Load();
         logger.LogInformation("Process list loaded");
+        await processManager.RestoreDesiredOnline();
+        logger.LogInformation("Desired online processes restored");
 
         while (!stoppingToken.IsCancellationRequested)
         {

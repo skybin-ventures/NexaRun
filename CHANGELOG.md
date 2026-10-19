@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-19
+- Lifecycle: fix PID reattach on daemon Load (preserve + fingerprint); DesiredStatus boot restore; monitor AutoRestart=false exits; cancel crash-restart on user stop; soft-then-force stop (8s); data dir `%ProgramData%\NexaRun`; pipe ACL for Interactive users
+- CLI: script-path `start`, incremental `logs --follow`, `describe` / `history` / `save` / `resurrect` / `daemon status` / `stop all` / `delete all`; exit codes 2/3; settle defaults 2s; PM2 JSON field subset on import
+- Tray: Processes window search/status filter, empty/error states, scroll-preserving refresh; shared log viewer; soft-then-force stop UX across dialogs
+- Tests: `NexaRun.Tests` lifecycle harness
+- Docs: README + CLI-GUIDE aligned with behavior
 
 ## 2026-10-17
 - Bump Skyb.Framework package refs / drop Directory.Build.props; refresh nexarun-processes.json

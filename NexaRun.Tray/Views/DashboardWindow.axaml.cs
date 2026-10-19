@@ -1,7 +1,9 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using NexaRun.Shared.Ipc;
 using NexaRun.Shared.Models;
+using NexaRun.Tray.Services;
 using NexaRun.Tray.ViewModels;
 
 namespace NexaRun.Tray.Views;
@@ -11,6 +13,7 @@ public partial class DashboardWindow : Window
     private IpcClient _ipc = null!;
     private DispatcherTimer? _timer;
     private string? _selectedName;
+    private TrayLogViewer _logViewer = null!;
 
     private TextBlock _statusText = null!;
     private Button _refreshBtn = null!, _restartBtn = null!, _openUrlBtn = null!, _logsBtn = null!;
@@ -22,11 +25,11 @@ public partial class DashboardWindow : Window
     private TextBlock _historyTitle = null!;
     private ItemsControl _uptimeBars = null!;
     private DataGrid _runGrid = null!;
-    private TextBlock _emptyText = null!;
+    private TextBlock _emptyText = null!, _emptyListText = null!;
     private StackPanel _detailTabs = null!;
     private Button _historyTabBtn = null!, _logsTabBtn = null!;
     private DockPanel _logsPanel = null!;
-    private TextBlock _logsTitle = null!;
+    private TextBlock _logsTitle = null!, _logsErrorBanner = null!;
     private Button _logsRefreshBtn = null!, _logsClearBtn = null!;
     private CheckBox _logsAutoScrollBox = null!;
     private CheckBox _logsLiveBox = null!;
@@ -48,34 +51,44 @@ public partial class DashboardWindow : Window
     {
         _ipc = ipc;
 
-        _statusText    = this.FindControl<TextBlock>("StatusText")!;
-        _refreshBtn    = this.FindControl<Button>("RefreshBtn")!;
-        _restartBtn    = this.FindControl<Button>("RestartBtn")!;
-        _openUrlBtn    = this.FindControl<Button>("OpenUrlBtn")!;
-        _logsBtn       = this.FindControl<Button>("LogsBtn")!;
-        _processList   = this.FindControl<ListBox>("ProcessList")!;
-        _statsBar      = this.FindControl<Border>("StatsBar")!;
-        _detailStatus  = this.FindControl<TextBlock>("DetailStatus")!;
-        _detailReason  = this.FindControl<TextBlock>("DetailReason")!;
-        _detailPid     = this.FindControl<TextBlock>("DetailPid")!;
-        _detailMemory  = this.FindControl<TextBlock>("DetailMemory")!;
+        _statusText = this.FindControl<TextBlock>("StatusText")!;
+        _refreshBtn = this.FindControl<Button>("RefreshBtn")!;
+        _restartBtn = this.FindControl<Button>("RestartBtn")!;
+        _openUrlBtn = this.FindControl<Button>("OpenUrlBtn")!;
+        _logsBtn = this.FindControl<Button>("LogsBtn")!;
+        _processList = this.FindControl<ListBox>("ProcessList")!;
+        _statsBar = this.FindControl<Border>("StatsBar")!;
+        _detailStatus = this.FindControl<TextBlock>("DetailStatus")!;
+        _detailReason = this.FindControl<TextBlock>("DetailReason")!;
+        _detailPid = this.FindControl<TextBlock>("DetailPid")!;
+        _detailMemory = this.FindControl<TextBlock>("DetailMemory")!;
         _detailRestarts = this.FindControl<TextBlock>("DetailRestarts")!;
-        _historyPanel  = this.FindControl<DockPanel>("HistoryPanel")!;
-        _historyTitle  = this.FindControl<TextBlock>("HistoryTitle")!;
-        _uptimeBars    = this.FindControl<ItemsControl>("UptimeBars")!;
-        _runGrid       = this.FindControl<DataGrid>("RunGrid")!;
-        _emptyText     = this.FindControl<TextBlock>("EmptyText")!;
-        _detailTabs    = this.FindControl<StackPanel>("DetailTabs")!;
+        _historyPanel = this.FindControl<DockPanel>("HistoryPanel")!;
+        _historyTitle = this.FindControl<TextBlock>("HistoryTitle")!;
+        _uptimeBars = this.FindControl<ItemsControl>("UptimeBars")!;
+        _runGrid = this.FindControl<DataGrid>("RunGrid")!;
+        _emptyText = this.FindControl<TextBlock>("EmptyText")!;
+        _emptyListText = this.FindControl<TextBlock>("EmptyListText")!;
+        _detailTabs = this.FindControl<StackPanel>("DetailTabs")!;
         _historyTabBtn = this.FindControl<Button>("HistoryTabBtn")!;
-        _logsTabBtn    = this.FindControl<Button>("LogsTabBtn")!;
-        _logsPanel     = this.FindControl<DockPanel>("LogsPanel")!;
-        _logsTitle     = this.FindControl<TextBlock>("LogsTitle")!;
+        _logsTabBtn = this.FindControl<Button>("LogsTabBtn")!;
+        _logsPanel = this.FindControl<DockPanel>("LogsPanel")!;
+        _logsTitle = this.FindControl<TextBlock>("LogsTitle")!;
+        _logsErrorBanner = this.FindControl<TextBlock>("LogsErrorBanner")!;
         _logsRefreshBtn = this.FindControl<Button>("LogsRefreshBtn")!;
-        _logsClearBtn   = this.FindControl<Button>("LogsClearBtn")!;
+        _logsClearBtn = this.FindControl<Button>("LogsClearBtn")!;
         _logsAutoScrollBox = this.FindControl<CheckBox>("LogsAutoScrollBox")!;
-        _logsLiveBox     = this.FindControl<CheckBox>("LogsLiveBox")!;
-        _logsScroller  = this.FindControl<ScrollViewer>("LogsScroller")!;
-        _logsBox       = this.FindControl<TextBox>("LogsBox")!;
+        _logsLiveBox = this.FindControl<CheckBox>("LogsLiveBox")!;
+        _logsScroller = this.FindControl<ScrollViewer>("LogsScroller")!;
+        _logsBox = this.FindControl<TextBox>("LogsBox")!;
+
+        _logViewer = new TrayLogViewer(
+            _ipc,
+            () => _selectedName,
+            _logsBox,
+            _logsScroller,
+            _logsAutoScrollBox,
+            _logsErrorBanner);
 
         WireEvents();
     }
@@ -85,11 +98,11 @@ public partial class DashboardWindow : Window
         _refreshBtn.Click += async (_, _) => await RefreshAll();
         _restartBtn.Click += async (_, _) => await RestartSelected();
         _openUrlBtn.Click += (_, _) => OpenSelectedUrl();
-        _logsBtn.Click += (_, _) => OpenLogsWindow();
+        _logsBtn.Click += async (_, _) => await ShowLogsTab();
         _historyTabBtn.Click += async (_, _) => await ShowHistoryTab();
         _logsTabBtn.Click += async (_, _) => await ShowLogsTab();
-        _logsRefreshBtn.Click += async (_, _) => await RefreshLogs();
-        _logsClearBtn.Click += async (_, _) => await ClearLogs();
+        _logsRefreshBtn.Click += async (_, _) => await _logViewer.Refresh();
+        _logsClearBtn.Click += async (_, _) => await _logViewer.ClearLogs(this);
         _logsLiveBox.IsCheckedChanged += (_, _) =>
         {
             if (_timer != null && _detailView == DetailView.Logs)
@@ -106,7 +119,20 @@ public partial class DashboardWindow : Window
                 ShowEmpty();
         };
 
-        Opened  += async (_, _) => { await RefreshProcesses(); StartTimer(); };
+        KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.F5)
+            {
+                e.Handled = true;
+                await RefreshAll();
+            }
+        };
+
+        Opened += async (_, _) =>
+        {
+            await RefreshProcesses();
+            StartTimer();
+        };
         Closing += (_, _) => _timer?.Stop();
     }
 
@@ -120,12 +146,10 @@ public partial class DashboardWindow : Window
     private async Task OnBackgroundTick()
     {
         await RefreshProcesses();
-
-        // Stats only — do not reload history grid or uptime chart
         UpdateSelectedStats();
 
         if (_detailView == DetailView.Logs && _logsLiveBox.IsChecked == true)
-            await RefreshLogs();
+            await _logViewer.Refresh();
     }
 
     private async Task RefreshAll()
@@ -137,7 +161,7 @@ public partial class DashboardWindow : Window
         if (item == null) return;
 
         if (_detailView == DetailView.Logs)
-            await RefreshLogs();
+            await _logViewer.Refresh();
         else
             await ShowDetail(item);
     }
@@ -170,13 +194,13 @@ public partial class DashboardWindow : Window
         if (!BrowserHelper.TryOpen(url))
             _statusText.Text = string.IsNullOrWhiteSpace(url)
                 ? "No URL configured for this process."
-                : $"⚠ Invalid URL: {url}";
+                : $"Warning: Invalid URL: {url}";
     }
 
     private async Task RefreshProcesses()
     {
         var response = await _ipc.Send(new IpcRequest { Command = "list" });
-        _statusText.Text = response.Success ? string.Empty : $"⚠ {response.Message}";
+        _statusText.Text = response.Success ? string.Empty : $"Warning: {response.Message}";
         if (!response.Success) return;
 
         var items = (response.Processes ?? [])
@@ -185,8 +209,8 @@ public partial class DashboardWindow : Window
 
         var prevSelected = _selectedName;
         _processList.ItemsSource = items;
+        _emptyListText.IsVisible = items.Count == 0;
 
-        // Restore selection without re-firing change when same item
         if (prevSelected != null)
         {
             var match = items.FirstOrDefault(x => x.Name == prevSelected);
@@ -198,11 +222,10 @@ public partial class DashboardWindow : Window
     private async Task ShowDetail(DashboardProcessItem item)
     {
         UpdateSelectedStats();
-        _statsBar.IsVisible  = true;
+        _statsBar.IsVisible = true;
         _emptyText.IsVisible = false;
         SetActionButtonsEnabled(item);
 
-        // Fetch run history
         var resp = await _ipc.Send(new IpcRequest { Command = "history", ProcessName = item.Name });
         var history = resp.RunHistory ?? [];
 
@@ -210,24 +233,21 @@ public partial class DashboardWindow : Window
         _logsTitle.Text = $"{item.Name} — log output";
         ApplyDetailView();
 
-        // Build 7-day uptime bars
         var bars = BuildUptimeBars(history);
         _uptimeBars.ItemsSource = bars;
-
-        // Populate run grid
         _runGrid.ItemsSource = history.Select(r => new RunHistoryRow(r)).ToList();
 
         if (_detailView == DetailView.Logs)
-            await RefreshLogs();
+            await _logViewer.Refresh();
     }
 
     private void ShowEmpty()
     {
-        _statsBar.IsVisible     = false;
-        _detailTabs.IsVisible   = false;
+        _statsBar.IsVisible = false;
+        _detailTabs.IsVisible = false;
         _historyPanel.IsVisible = false;
-        _logsPanel.IsVisible    = false;
-        _emptyText.IsVisible    = true;
+        _logsPanel.IsVisible = false;
+        _emptyText.IsVisible = true;
         _detailReason.IsVisible = false;
         SetActionButtonsEnabled(null);
     }
@@ -256,7 +276,7 @@ public partial class DashboardWindow : Window
 
             if (!response.Success)
             {
-                _statusText.Text = $"⚠ {response.Message}";
+                _statusText.Text = $"Warning: {response.Message}";
                 return;
             }
 
@@ -267,12 +287,6 @@ public partial class DashboardWindow : Window
         {
             SetActionButtonsEnabled(FindSelectedItem());
         }
-    }
-
-    private void OpenLogsWindow()
-    {
-        if (string.IsNullOrEmpty(_selectedName)) return;
-        new LogsWindow(_ipc, _selectedName).Show();
     }
 
     private async Task ShowHistoryTab()
@@ -292,7 +306,7 @@ public partial class DashboardWindow : Window
         ApplyDetailView();
         if (_timer != null)
             _timer.Interval = _logsLiveBox.IsChecked == true ? LogsLiveInterval : ListRefreshInterval;
-        await RefreshLogs();
+        await _logViewer.Refresh();
     }
 
     private void ApplyDetailView()
@@ -304,53 +318,14 @@ public partial class DashboardWindow : Window
         var history = _detailView == DetailView.History;
         _historyPanel.IsVisible = hasSelection && history;
         _logsPanel.IsVisible = hasSelection && !history;
+
+        SetTabActive(_historyTabBtn, history);
+        SetTabActive(_logsTabBtn, !history);
     }
 
-    private async Task RefreshLogs()
+    private static void SetTabActive(Button button, bool active)
     {
-        if (string.IsNullOrEmpty(_selectedName)) return;
-
-        var response = await _ipc.Send(new IpcRequest
-        {
-            Command = "logs",
-            ProcessName = _selectedName,
-            LogLines = 300
-        });
-
-        if (!response.Success)
-        {
-            _logsBox.Text = response.Message;
-            return;
-        }
-
-        _logsBox.Text = response.Logs ?? string.Empty;
-        if (_logsAutoScrollBox.IsChecked == true)
-            _logsScroller.ScrollToEnd();
-    }
-
-    private async Task ClearLogs()
-    {
-        if (string.IsNullOrEmpty(_selectedName)) return;
-
-        var dlg = new ConfirmDialog(
-            $"Clear logs for '{_selectedName}'?",
-            "Deletes the on-disk log files for this process. New output will continue to be captured.");
-        var confirmed = await dlg.ShowDialog<bool>(this);
-        if (!confirmed) return;
-
-        var response = await _ipc.Send(new IpcRequest
-        {
-            Command = "clear-logs",
-            ProcessName = _selectedName
-        });
-
-        if (!response.Success)
-        {
-            _logsBox.Text = response.Message;
-            return;
-        }
-
-        await RefreshLogs();
+        button.Classes.Set("active", active);
     }
 
     private static List<UptimeDayBar> BuildUptimeBars(List<ProcessRun> history)
@@ -360,17 +335,17 @@ public partial class DashboardWindow : Window
 
         for (int i = 6; i >= 0; i--)
         {
-            var day     = today.AddDays(-i);
-            var dayEnd  = day.AddDays(1);
+            var day = today.AddDays(-i);
+            var dayEnd = day.AddDays(1);
             var seconds = 86400.0;
 
-            // Sum time the process was running during this calendar day
             double uptimeSec = 0;
             foreach (var run in history)
             {
-                var runStart = run.StartedAt > day     ? run.StartedAt : day;
-                var runEnd   = (run.EndedAt ?? DateTime.UtcNow) < dayEnd
-                             ? (run.EndedAt ?? DateTime.UtcNow) : dayEnd;
+                var runStart = run.StartedAt > day ? run.StartedAt : day;
+                var runEnd = (run.EndedAt ?? DateTime.UtcNow) < dayEnd
+                    ? (run.EndedAt ?? DateTime.UtcNow)
+                    : dayEnd;
                 if (runEnd > runStart)
                     uptimeSec += (runEnd - runStart).TotalSeconds;
             }

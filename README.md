@@ -82,7 +82,7 @@ Click the NexaRun icon in the system tray to get started. Right-click for the me
 | **Add Process → Import JSON…** | Same import from the Add Process window |
 | **Export JSON…** | Save definitions for another machine |
 | **Processes window** | **Import JSON** / **Export JSON** toolbar buttons (same as tray) |
-| **Open data folder** | Opens `%APPDATA%\NexaRun` |
+| **Open data folder** | Opens `%ProgramData%\NexaRun` |
 
 ### Processes Window
 
@@ -95,7 +95,7 @@ Right-click tray → **Processes** to see all running processes. The list auto-r
 | **Clear All** | Stop running apps, remove every entry, and save an empty process list |
 | **Settings** | Recovery interval, enable/disable recovery, AWS SES email alerts |
 | **Open URL** | Open the process URL in your browser (if configured) |
-| **Stop** | Gracefully stop the process |
+| **Stop** | Soft-stop attempt, then force-kill the process tree after a timeout |
 | **Restart** | Stop and start again |
 | **Logs** | View live output from the process |
 | **Edit** | Change settings (takes effect immediately) |
@@ -105,7 +105,7 @@ Right-click tray → **Processes** to see all running processes. The list auto-r
 
 Right-click tray → **Dashboard** to see a 7-day history for any process — uptime bar chart, run history grid, and a **Logs** tab (same window). **Restart** and **Logs** buttons in the stats bar restart the selected process or open the log viewer window. Use **↻ Refresh** for a full reload; background updates refresh the process list every 45 seconds only.
 
-Tray crashes are written to **Event Viewer** (Application → **NexaRun-Tray**) and `%APPDATA%\NexaRun\logs\tray-crash.log`.
+Tray crashes are written to **Event Viewer** (Application → **NexaRun-Tray**) and `%ProgramData%\NexaRun\logs\tray-crash.log`.
 
 ---
 
@@ -117,7 +117,7 @@ The `nexarun` command is on your PATH after install. It talks to the **NexaRun D
 Daemon is not running. Start it with: nexarun daemon start
 ```
 
-**Data folder:** `%APPDATA%\NexaRun\` (`processes.json`, `history.json`, `logs\`)
+**Data folder:** `%ProgramData%\NexaRun\` (`processes.json`, `history.json`, `logs\`, `settings.json`). Shared by the LocalSystem daemon, CLI, and tray. Legacy `%APPDATA%\NexaRun` and `%USERPROFILE%\.nexarun` are migrated automatically when ProgramData is empty.
 
 **Dev usage:** `dotnet run --project NexaRun.Cli -- <command>`
 
@@ -125,26 +125,35 @@ Daemon is not running. Start it with: nexarun daemon start
 
 ```text
 nexarun
-├── start <id|name|exe>  Start saved process or new executable
+├── start <id|name|script> Start saved process or new script/executable
 ├── import <file.json>     Import processes from JSON
-├── stop <id|name>         Stop a process
+├── stop <id|name|all>     Stop a process (or all)
 ├── restart <id|name>      Restart a process
 ├── restart-all            Restart every process
-├── delete <id|name>       Remove from managed list
+├── delete <id|name|all>   Remove from managed list (or all)
+├── clear-all              Stop and clear every process
 ├── list                   List all processes (shows id)
+├── describe <id|name>     Full process details (JSON)
 ├── logs <id|name>         Show process logs
+├── history <id|name>      Recent run history
+├── save                   Persist process list / desired state
+├── resurrect              Start all DesiredStatus=Online processes
+├── version                Print CLI version
 └── daemon
     ├── start              Start daemon (service or dev exe)
-    └── stop               Stop daemon service
+    ├── stop               Stop daemon service
+    └── status             Service + pipe + data directory
 ```
 
 ### `nexarun start`
 
-Start a **saved** process by id/name (`nexarun start 0`) or register and run a **new** executable (`nexarun start dotnet --args "run" ...`).
+Start a **saved** process by id/name (`nexarun start 0`), or register and run a **new** script/executable. Paths and known extensions (`.js`, `.exe`, `.cmd`, …) register as new apps without requiring extra flags:
 
 ```powershell
-nexarun start <id|name|executable> [options]
+nexarun start .\server.js
+nexarun start <id|name|executable> [options] [-- app args...]
 ```
+
 
 | Option | Description |
 |--------|-------------|
@@ -161,11 +170,13 @@ nexarun start <id|name|executable> [options]
 | `--time` | Timestamp each log line |
 
 ```powershell
+nexarun start .\app.js --name worker
 nexarun start dotnet --name myapi --args "run --project ." --cwd "C:\Projects\MyApi"
 nexarun start npm --name mysite --args "run start" --cwd "C:\Projects\my-site"
 nexarun start node --name worker --args "server.js" --cwd "C:\Projects\worker"
 nexarun start python --name bot --args "app.py" --cwd "C:\Projects\bot"
 ```
+
 
 ### `nexarun import`
 
@@ -201,17 +212,18 @@ Like PM2, use the **id** from `nexarun list` or the process **name**:
 ```powershell
 nexarun list
 nexarun stop 0
+nexarun stop all
 nexarun restart 3
 nexarun delete myapi
+nexarun delete all
 nexarun start 0          # start a stopped saved process by id
 nexarun start myapi      # start by name
+nexarun describe myapi
+nexarun save
+nexarun resurrect
 ```
 
-To register a **new** executable (not an existing saved process), pass flags such as `--args`, `--cwd`, or `--name`:
-
-```powershell
-nexarun start dotnet --name api --args "run" --cwd C:\Api
-```
+Saved processes remember **DesiredStatus**. User start → desired Online; user stop → desired Stopped. When the Windows service starts, NexaRun reattaches live PIDs and starts any remaining Desired Online apps (boot restore). `nexarun daemon start` alone does not invent desired state.
 
 ### `nexarun logs`
 
@@ -224,7 +236,7 @@ nexarun logs <id|name> [options]
 | `--lines <n>` | `50` | Lines to show |
 | `--out` | — | Stdout log only |
 | `--err` | — | Stderr log only |
-| `--follow` | — | Stream logs (poll every 1s; Ctrl+C to exit) |
+| `--follow` | — | Append new log bytes (Ctrl+C exits 0) |
 
 ```powershell
 nexarun logs myapi
@@ -232,30 +244,32 @@ nexarun logs myapi --lines 200 --err
 nexarun logs myapi --follow
 ```
 
-Default log path: `%APPDATA%\NexaRun\logs\<name>.log`
+Default log path: `%ProgramData%\NexaRun\logs\<name>.log`
 
 ### `nexarun daemon`
 
 ```powershell
 nexarun daemon start
 nexarun daemon stop
+nexarun daemon status
 ```
 
-Starts or stops the Windows service `NexaRunDaemon` (or the dev daemon exe when not installed).
+Starts or stops the Windows service `NexaRunDaemon` (or the dev daemon exe when not installed). `status` reports service state, named-pipe reachability, and the data directory.
 
 ### Quick reference
 
 | Command | Example |
 |---------|---------|
-| Start | `nexarun start dotnet --name api --args "run" --cwd C:\Api` |
+| Start | `nexarun start .\app.js` or `nexarun start dotnet --name api --args "run" --cwd C:\Api` |
 | Import | `nexarun import nexarun-processes.json` |
 | List | `nexarun list` |
-| Stop | `nexarun stop 0` or `nexarun stop api` |
+| Describe | `nexarun describe api` |
+| Stop | `nexarun stop 0` / `nexarun stop all` |
 | Restart | `nexarun restart 0` |
-| Delete | `nexarun delete 0` |
-| Start saved | `nexarun start 0` |
+| Delete | `nexarun delete 0` / `nexarun delete all` |
+| Save / resurrect | `nexarun save` / `nexarun resurrect` |
 | Logs | `nexarun logs 0 --follow` |
-| Daemon | `nexarun daemon start` |
+| Daemon | `nexarun daemon status` |
 
 ```powershell
 nexarun --help
@@ -305,23 +319,29 @@ Import/export uses **JSON only** (`nexarun-processes.json`). Example in the repo
 | `environment` | Env vars (object) |
 | `url` | Optional link opened via **Open URL** in the Processes window |
 
+**PM2 ecosystem subset:** when importing JSON you may also use `args`, `cwd`, `env`, `max_restarts`, `autorestart`, `error_file`, `out_file`, `log_file`. Unsupported: `instances`, `exec_mode`, `watch`, `cron_restart`, and `.js` ecosystem files.
+
 ---
 
 ## Process Logs
 
-Process definitions and logs are stored under `%APPDATA%\NexaRun\` (`processes.json`, `history.json`, `logs\`). Legacy `%USERPROFILE%\.nexarun\` data is migrated automatically on first run.
+Process definitions and logs are stored under `%ProgramData%\NexaRun\` (`processes.json`, `history.json`, `logs\`). Legacy `%APPDATA%\NexaRun` and `%USERPROFILE%\.nexarun\` data is migrated automatically when ProgramData is empty.
 
-By default, output is saved to `%APPDATA%\NexaRun\logs\<name>.log`. Configure log paths in the JSON file or with `--out` / `--error` / `--log` on `nexarun start`. If you set separate `outLogFile` and `errorLogFile`, NexaRun also writes daemon events to `<name>.log` in the same folder (not the same file as `outLogFile`). Log files rotate at 10 MB (`.log.1` backup). Use `logTimestamps` or `--time` for timestamp prefixes.
+By default, output is saved to `%ProgramData%\NexaRun\logs\<name>.log`. Configure log paths in the JSON file or with `--out` / `--error` / `--log` on `nexarun start`. If you set separate `outLogFile` and `errorLogFile`, NexaRun also writes daemon events to `<name>.log` in the same folder (not the same file as `outLogFile`). Log files rotate at 10 MB (`.log.1` backup). Use `logTimestamps` or `--time` for timestamp prefixes.
+
+Launched apps inherit the **daemon service environment** (LocalSystem by default). Prefer absolute paths and per-process `environment` entries rather than relying on an interactive user profile or PATH.
 
 ---
 
 ## Auto-Restart
 
-Crashed processes restart automatically with exponential backoff (1s, 2s, 4s, 8s, up to 30s max) so a tight crash loop doesn't hammer the system. By default NexaRun retries **3 times**; after that the process is marked errored until you start it again. Override with `--max-restarts` on the CLI. If a process stays up for 30 seconds, the restart counter resets.
+Crashed processes with auto-restart enabled relaunch with exponential backoff (1s, 2s, 4s, 8s, up to 30s max). By default NexaRun retries **3 times**; after that the process is marked **Errored**. Override with `--max-restarts`. If a process stays up for 30 seconds, the restart counter resets. With `--no-autorestart`, an exit is recorded as **Errored** (auto-restart off) so status and alerts stay accurate.
 
-If you set a **per-process** CPU or memory limit, NexaRun restarts that process when it exceeds its own limit (not a total across all apps). If it cannot recover, status becomes **Errored** with a reason in the Processes/Dashboard UI, `nexarun list`, and the process log (`<name>.log` under your log folder).
+User **stop** cancels any pending crash-restart backoff. Stop tries a soft signal (CloseMainWindow / CTRL_BREAK when available), waits up to **8 seconds**, then force-kills the process tree. Windowless redirected children often have no console — force kill is the reliable path on Windows.
 
-In **Settings**, configure failed-process recovery (default every **10 minutes**, minimum 10) and optional **AWS SES email alerts** when a process goes from Online to Errored. Choose **SES API** (IAM access key) or **SES SMTP** (SMTP credentials from the SES console). Set **From** (verified SES sender) and **To** (alert recipient), plus AWS region. Credentials are stored in `%APPDATA%\NexaRun\settings.json` on the host (restrict file permissions on shared machines).
+If you set a **per-process** CPU or memory limit, NexaRun restarts that process when it exceeds its own limit (not a total across all apps). If it cannot recover, status becomes **Errored** with a reason in the Processes/Dashboard UI, `nexarun list`, and the process log.
+
+In **Settings**, configure failed-process recovery (default every **10 minutes**, minimum 10) and optional **AWS SES email alerts** when a process goes from Online to Errored. Credentials are stored in `%ProgramData%\NexaRun\settings.json` (restrict ACLs on shared machines).
 
 When recovery is enabled, the daemon tries **one** start for each **Errored** process per interval (crash restart counter resets for that attempt).
 

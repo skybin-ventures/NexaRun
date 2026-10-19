@@ -10,6 +10,11 @@ public class NexaProcess
     public string Arguments { get; set; } = string.Empty;
     public string WorkingDirectory { get; set; } = string.Empty;
     public ProcessStatus Status { get; set; }
+    /// <summary>
+    /// Intended runtime state across daemon restarts. User Start → Online; user Stop/Delete → Stopped.
+    /// Crashes do not clear this; boot restore starts processes still Desired Online.
+    /// </summary>
+    public ProcessStatus DesiredStatus { get; set; } = ProcessStatus.Stopped;
     /// <summary>Why the process is Errored (crash limit, per-process CPU/memory limit, launch failure).</summary>
     public string? StatusReason { get; set; }
     public int? Pid { get; set; }

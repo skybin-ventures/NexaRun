@@ -3,4 +3,5 @@
   <Project Path="NexaRun.Daemon/NexaRun.Daemon.csproj" />
   <Project Path="NexaRun.Shared/NexaRun.Shared.csproj" />
   <Project Path="NexaRun.Tray/NexaRun.Tray.csproj" />
+  <Project Path="NexaRun.Tests/NexaRun.Tests.csproj" />
 </Solution>

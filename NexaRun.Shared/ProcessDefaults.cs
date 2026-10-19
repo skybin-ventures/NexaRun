@@ -8,10 +8,13 @@ public static class ProcessDefaults
     public const int MinUptimeSecondsToResetRestarts = 30;
 
     /// <summary>Wait after killing a process before starting again (port/log handle release).</summary>
-    public const int RestartSettleMs = 30_000;
+    public const int RestartSettleMs = 2_000;
 
     /// <summary>Wait after a successful start before launching the next process in a batch.</summary>
-    public const int StartSettleMs = 30_000;
+    public const int StartSettleMs = 2_000;
+
+    /// <summary>Soft-stop wait before force-killing the process tree.</summary>
+    public const int StopTimeoutMs = 8_000;
 
     /// <summary>Minimum minutes between failed-process recovery checks (configurable in Settings).</summary>
     public const int MinFailedRecoveryIntervalMinutes = 10;
@@ -22,4 +25,3 @@ public static class ProcessDefaults
     /// <summary>Rotate log files when they exceed this size (bytes).</summary>
     public const long MaxLogFileBytes = 10 * 1024 * 1024;
 }
-

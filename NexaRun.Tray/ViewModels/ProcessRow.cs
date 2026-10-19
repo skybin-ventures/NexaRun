@@ -7,30 +7,25 @@ public class ProcessRow(NexaProcess p)
 {
     public int Id { get; } = p.Id;
     public string Name { get; } = p.Name;
-    public string Status { get; } = NexaProcessDisplay.StatusText(p);
+    public string Status { get; } = NexaProcessDisplay.ShortStatusText(p);
+    public string StatusTooltip { get; } = BuildStatusTooltip(p);
     public string? StatusReason { get; } = p.StatusReason;
-    public string Url { get; } = string.IsNullOrWhiteSpace(p.Url) ? "—" : p.Url;
+    public ProcessStatus StatusValue { get; } = p.Status;
+    public string Url { get; } = string.IsNullOrWhiteSpace(p.Url) ? NexaProcessDisplay.EmptyPlaceholder : p.Url;
     public bool HasUrl { get; } = !string.IsNullOrWhiteSpace(p.Url);
-    public string Pid { get; } = p.Pid?.ToString() ?? "-";
+    public string Pid { get; } = NexaProcessDisplay.FormatPid(p.Pid);
     public int Restarts { get; } = p.Restarts;
-    public string Memory { get; } = FormatMemory(p.MemoryUsage);
-    public string Uptime { get; } = p.Status == ProcessStatus.Online ? FormatUptime(p.StartedAt) : "-";
+    public string Cpu { get; } = NexaProcessDisplay.FormatCpu(p.CpuUsage);
+    public string Memory { get; } = NexaProcessDisplay.FormatMemory(p.MemoryUsage);
+    public string Uptime { get; } = NexaProcessDisplay.FormatUptime(p.Status, p.StartedAt);
     public bool IsOnline { get; } = p.Status == ProcessStatus.Online;
+    public bool CanStart { get; } = p.Status is ProcessStatus.Stopped or ProcessStatus.Errored;
     public NexaProcess Source { get; } = p;
 
-    private static string FormatMemory(long bytes)
+    private static string BuildStatusTooltip(NexaProcess p)
     {
-        if (bytes <= 0) return "-";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024} KB";
-        return $"{bytes / (1024 * 1024)} MB";
-    }
-
-    private static string FormatUptime(DateTime startedAt)
-    {
-        var span = DateTime.UtcNow - startedAt;
-        if (span.TotalDays >= 1) return $"{(int)span.TotalDays}d";
-        if (span.TotalHours >= 1) return $"{(int)span.TotalHours}h";
-        if (span.TotalMinutes >= 1) return $"{(int)span.TotalMinutes}m";
-        return $"{(int)span.TotalSeconds}s";
+        if (!string.IsNullOrWhiteSpace(p.StatusReason))
+            return p.StatusReason!;
+        return NexaProcessDisplay.StatusText(p);
     }
 }

@@ -3,77 +3,98 @@
         x:Class="NexaRun.Tray.Views.SettingsWindow"
         Title="NexaRun Settings"
         Width="540" Height="640"
-        CanResize="False"
-        WindowStartupLocation="CenterScreen">
+        MinWidth="420" MinHeight="360"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner">
 
-  <ScrollViewer>
-    <StackPanel Margin="20" Spacing="10">
-
-      <TextBlock Text="Failed process recovery" FontWeight="Bold" FontSize="14" />
-      <CheckBox x:Name="RecoveryEnabledBox"
-                Content="Enable periodic recovery for Errored processes"
-                IsChecked="True" />
-      <TextBlock Text="Check interval (minutes, minimum 10)" />
-      <TextBox x:Name="RecoveryIntervalBox" PlaceholderText="10" />
-
-      <Separator Margin="0 8" />
-
-      <TextBlock Text="Email alerts (AWS SES)" FontWeight="Bold" FontSize="14" />
-      <CheckBox x:Name="EmailEnabledBox"
-                Content="Send email when a process goes from Online to Errored" />
-
-      <TextBlock Text="Delivery method" />
-      <ComboBox x:Name="EmailProviderBox" HorizontalAlignment="Stretch">
-        <ComboBoxItem Content="SES API (IAM access key)" Tag="ses-api" />
-        <ComboBoxItem Content="SES SMTP (SMTP credentials)" Tag="ses-smtp" />
-      </ComboBox>
-
-      <TextBlock Text="From (verified SES sender)" FontWeight="SemiBold" />
-      <TextBox x:Name="EmailFromBox" PlaceholderText="alerts@yourdomain.com" />
-
-      <TextBlock Text="To (alert recipient)" />
-      <TextBox x:Name="EmailToBox" PlaceholderText="you@example.com" />
-
-      <TextBlock Text="AWS region" Margin="0 4 0 0" />
-      <TextBox x:Name="AwsRegionBox" PlaceholderText="us-east-1" />
-
-      <StackPanel x:Name="SesApiPanel" Spacing="8">
-        <TextBlock Text="SES API credentials" FontWeight="SemiBold" Margin="0 4 0 0" />
-        <TextBlock Text="IAM access key ID" />
-        <TextBox x:Name="AwsAccessKeyBox" PlaceholderText="AKIA..." />
-        <TextBlock Text="IAM secret access key" />
-        <TextBox x:Name="AwsSecretBox" PasswordChar="•" PlaceholderText="Leave blank to keep existing" />
-      </StackPanel>
-
-      <StackPanel x:Name="SesSmtpPanel" Spacing="8" IsVisible="False">
-        <TextBlock Text="SES SMTP credentials" FontWeight="SemiBold" Margin="0 4 0 0" />
-        <TextBlock Foreground="Gray" FontSize="11" TextWrapping="Wrap"
-                   Text="Host is email-smtp.{region}.amazonaws.com (set automatically from region)." />
-        <TextBlock Text="SMTP username (from SES → SMTP settings)" />
-        <TextBox x:Name="SesSmtpUserBox" PlaceholderText="SMTP username" />
-        <TextBlock Text="SMTP password" />
-        <TextBox x:Name="SesSmtpPasswordBox" PasswordChar="•" PlaceholderText="Leave blank to keep existing" />
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-          <StackPanel Grid.Column="0">
-            <TextBlock Text="SMTP port" />
-            <TextBox x:Name="SesSmtpPortBox" PlaceholderText="587" />
-          </StackPanel>
-          <StackPanel Grid.Column="1" VerticalAlignment="Bottom">
-            <CheckBox x:Name="SesSmtpTlsBox" Content="Use TLS" IsChecked="True" />
-          </StackPanel>
-        </Grid>
-      </StackPanel>
-
-      <TextBlock Foreground="Gray" FontSize="11" TextWrapping="Wrap"
-                 Text="Stored in %APPDATA%\NexaRun\settings.json on this machine." />
-
-      <TextBlock x:Name="ErrorText" Foreground="Salmon" FontSize="12" IsVisible="False" TextWrapping="Wrap" />
-
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0 12 0 0">
-        <Button x:Name="CancelBtn" Content="Cancel" />
-        <Button x:Name="SaveBtn" Content="Save" />
-      </StackPanel>
-
+  <DockPanel Margin="20">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                Spacing="8" Margin="0 12 0 0">
+      <Button x:Name="CancelBtn" Content="Cancel" IsCancel="True" />
+      <Button x:Name="SaveBtn" Content="Save" IsDefault="True" Classes="accent" />
     </StackPanel>
-  </ScrollViewer>
+
+    <TextBlock x:Name="ErrorText" DockPanel.Dock="Bottom" Classes="errorText"
+               IsVisible="False" Margin="0 0 0 8" />
+
+    <ScrollViewer>
+      <StackPanel Spacing="10">
+
+        <TextBlock x:Name="LoadWarningText" Classes="errorText" IsVisible="False" TextWrapping="Wrap" />
+
+        <TextBlock Text="Failed process recovery" FontWeight="Bold" FontSize="14" />
+        <CheckBox x:Name="RecoveryEnabledBox"
+                  Content="Enable periodic recovery for Errored processes"
+                  IsChecked="True" />
+        <StackPanel x:Name="RecoveryFieldsPanel" Spacing="10">
+          <TextBlock Text="Check interval (minutes, minimum 10)" />
+          <TextBox x:Name="RecoveryIntervalBox" PlaceholderText="10"
+                   AutomationProperties.Name="Recovery check interval minutes" />
+        </StackPanel>
+
+        <Separator Margin="0 8" />
+
+        <TextBlock Text="Email alerts (AWS SES)" FontWeight="Bold" FontSize="14" />
+        <CheckBox x:Name="EmailEnabledBox"
+                  Content="Send email when a process goes from Online to Errored" />
+
+        <StackPanel x:Name="EmailFieldsPanel" Spacing="10" IsEnabled="False">
+          <TextBlock Text="Delivery method" />
+          <ComboBox x:Name="EmailProviderBox" HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="Email delivery method">
+            <ComboBoxItem Content="SES API (IAM access key)" Tag="ses-api" />
+            <ComboBoxItem Content="SES SMTP (SMTP credentials)" Tag="ses-smtp" />
+          </ComboBox>
+
+          <TextBlock Text="From (verified SES sender)" FontWeight="SemiBold" />
+          <TextBox x:Name="EmailFromBox" PlaceholderText="alerts@yourdomain.com"
+                   AutomationProperties.Name="From email address" />
+
+          <TextBlock Text="To (alert recipient)" />
+          <TextBox x:Name="EmailToBox" PlaceholderText="you@example.com"
+                   AutomationProperties.Name="To email address" />
+
+          <TextBlock Text="AWS region" Margin="0 4 0 0" />
+          <TextBox x:Name="AwsRegionBox" PlaceholderText="us-east-1"
+                   AutomationProperties.Name="AWS region" />
+
+          <StackPanel x:Name="SesApiPanel" Spacing="8">
+            <TextBlock Text="SES API credentials" FontWeight="SemiBold" Margin="0 4 0 0" />
+            <TextBlock Text="IAM access key ID" />
+            <TextBox x:Name="AwsAccessKeyBox" PlaceholderText="AKIA..."
+                     AutomationProperties.Name="IAM access key ID" />
+            <TextBlock Text="IAM secret access key" />
+            <TextBox x:Name="AwsSecretBox" PasswordChar="•" PlaceholderText="Leave blank to keep existing"
+                     AutomationProperties.Name="IAM secret access key" />
+          </StackPanel>
+
+          <StackPanel x:Name="SesSmtpPanel" Spacing="8" IsVisible="False">
+            <TextBlock Text="SES SMTP credentials" FontWeight="SemiBold" Margin="0 4 0 0" />
+            <TextBlock Classes="statusMuted" FontSize="11" TextWrapping="Wrap"
+                       Text="Host is email-smtp.{region}.amazonaws.com (set automatically from region)." />
+            <TextBlock Text="SMTP username (from SES → SMTP settings)" />
+            <TextBox x:Name="SesSmtpUserBox" PlaceholderText="SMTP username"
+                     AutomationProperties.Name="SMTP username" />
+            <TextBlock Text="SMTP password" />
+            <TextBox x:Name="SesSmtpPasswordBox" PasswordChar="•" PlaceholderText="Leave blank to keep existing"
+                     AutomationProperties.Name="SMTP password" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="SMTP port" />
+                <TextBox x:Name="SesSmtpPortBox" PlaceholderText="587"
+                         AutomationProperties.Name="SMTP port" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Bottom">
+                <CheckBox x:Name="SesSmtpTlsBox" Content="Use TLS" IsChecked="True" />
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Classes="statusMuted" FontSize="11" TextWrapping="Wrap"
+                   Text="Stored in %APPDATA%\NexaRun\settings.json on this machine." />
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </Window>

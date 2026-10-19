@@ -11,7 +11,7 @@ public static class TrayImportExportActions
         var path = TrayConfigService.FindConfigFile("nexarun-processes.json", "processes.json");
         if (path == null)
         {
-            await MessageDialog.Show("File not found",
+            await MessageDialog.Show(owner, "File not found",
                 $"Copy nexarun-processes.json next to NexaRun.exe or into:\n{NexaRunPaths.DataDir}");
             return;
         }
@@ -39,13 +39,13 @@ public static class TrayImportExportActions
         if (path == null) return;
 
         var (ok, msg) = await config.ExportToFile(path);
-        await MessageDialog.Show(ok ? "Export complete" : "Export failed", msg);
+        await MessageDialog.Show(owner, ok ? "Export complete" : "Export failed", msg);
     }
 
     private static async Task ImportFile(Window? owner, TrayConfigService config, string path, Func<Task>? onSuccess)
     {
         var (ok, msg) = await config.ImportJsonFile(path);
-        await MessageDialog.Show(ok ? "Import complete" : "Import failed", msg);
+        await MessageDialog.Show(owner, ok ? "Import complete" : "Import failed", msg);
         if (ok && onSuccess != null)
             await onSuccess();
     }

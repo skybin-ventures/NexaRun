@@ -1,16 +1,19 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NexaRun.Tray.Views.ConfirmDialog"
-        Width="360" Height="160"
+        Width="420"
+        MinHeight="160"
+        SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
   <StackPanel Margin="20" Spacing="10">
-    <TextBlock x:Name="HeadingText" FontWeight="Bold" FontSize="14" />
-    <TextBlock x:Name="BodyText" Foreground="Gray" />
+    <TextBlock x:Name="HeadingText" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" />
+    <TextBlock x:Name="BodyText" Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+               TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0 12 0 0">
-      <Button x:Name="CancelBtn" Content="Cancel" />
-      <Button x:Name="ConfirmBtn" Content="Confirm" />
+      <Button x:Name="CancelBtn" Content="Cancel" IsCancel="True" MinWidth="80" />
+      <Button x:Name="ConfirmBtn" Content="Confirm" IsDefault="True" MinWidth="80" Classes="accent" />
     </StackPanel>
   </StackPanel>
 

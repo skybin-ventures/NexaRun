@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using NexaRun.Shared;
 using NexaRun.Shared.Config;
 using NexaRun.Shared.Ipc;
@@ -14,14 +13,16 @@ public partial class SettingsWindow : Window
 
     private CheckBox _recoveryEnabledBox = null!;
     private TextBox _recoveryIntervalBox = null!;
+    private StackPanel _recoveryFieldsPanel = null!;
     private CheckBox _emailEnabledBox = null!;
+    private StackPanel _emailFieldsPanel = null!;
     private ComboBox _emailProviderBox = null!;
     private TextBox _emailFromBox = null!, _emailToBox = null!;
     private TextBox _awsRegionBox = null!, _awsAccessKeyBox = null!, _awsSecretBox = null!;
     private StackPanel _sesApiPanel = null!, _sesSmtpPanel = null!;
     private TextBox _sesSmtpUserBox = null!, _sesSmtpPasswordBox = null!, _sesSmtpPortBox = null!;
     private CheckBox _sesSmtpTlsBox = null!;
-    private TextBlock _errorText = null!;
+    private TextBlock _errorText = null!, _loadWarningText = null!;
     private Button _saveBtn = null!, _cancelBtn = null!;
 
     public SettingsWindow()
@@ -41,7 +42,9 @@ public partial class SettingsWindow : Window
     {
         _recoveryEnabledBox = this.FindControl<CheckBox>("RecoveryEnabledBox")!;
         _recoveryIntervalBox = this.FindControl<TextBox>("RecoveryIntervalBox")!;
+        _recoveryFieldsPanel = this.FindControl<StackPanel>("RecoveryFieldsPanel")!;
         _emailEnabledBox = this.FindControl<CheckBox>("EmailEnabledBox")!;
+        _emailFieldsPanel = this.FindControl<StackPanel>("EmailFieldsPanel")!;
         _emailProviderBox = this.FindControl<ComboBox>("EmailProviderBox")!;
         _emailFromBox = this.FindControl<TextBox>("EmailFromBox")!;
         _emailToBox = this.FindControl<TextBox>("EmailToBox")!;
@@ -55,6 +58,7 @@ public partial class SettingsWindow : Window
         _sesSmtpPortBox = this.FindControl<TextBox>("SesSmtpPortBox")!;
         _sesSmtpTlsBox = this.FindControl<CheckBox>("SesSmtpTlsBox")!;
         _errorText = this.FindControl<TextBlock>("ErrorText")!;
+        _loadWarningText = this.FindControl<TextBlock>("LoadWarningText")!;
         _saveBtn = this.FindControl<Button>("SaveBtn")!;
         _cancelBtn = this.FindControl<Button>("CancelBtn")!;
     }
@@ -64,6 +68,14 @@ public partial class SettingsWindow : Window
         _saveBtn.Click += async (_, _) => await SaveSettings();
         _cancelBtn.Click += (_, _) => Close();
         _emailProviderBox.SelectionChanged += (_, _) => UpdateProviderPanels();
+        _recoveryEnabledBox.IsCheckedChanged += (_, _) => UpdateDisclosure();
+        _emailEnabledBox.IsCheckedChanged += (_, _) => UpdateDisclosure();
+    }
+
+    private void UpdateDisclosure()
+    {
+        _recoveryFieldsPanel.IsEnabled = _recoveryEnabledBox.IsChecked == true;
+        _emailFieldsPanel.IsEnabled = _emailEnabledBox.IsChecked == true;
     }
 
     private void UpdateProviderPanels()
@@ -97,7 +109,15 @@ public partial class SettingsWindow : Window
 
     private async Task LoadSettings()
     {
+        _loadWarningText.IsVisible = false;
         var response = await _ipc.Send(new IpcRequest { Command = "get-settings" });
+        if (!response.Success)
+        {
+            _loadWarningText.Text =
+                $"Warning: Could not load settings from daemon ({response.Message}). Showing local settings.json.";
+            _loadWarningText.IsVisible = true;
+        }
+
         _loaded = response.Settings ?? await NexaRunSettingsStore.LoadAsync();
 
         _recoveryEnabledBox.IsChecked = _loaded.FailedRecoveryEnabled;
@@ -114,6 +134,7 @@ public partial class SettingsWindow : Window
         _sesSmtpTlsBox.IsChecked = _loaded.SesSmtpUseTls;
 
         SelectProvider(_loaded.EmailProvider);
+        UpdateDisclosure();
     }
 
     private async Task SaveSettings()
@@ -224,7 +245,7 @@ public partial class SettingsWindow : Window
                 return;
             }
 
-            await MessageDialog.Show("Settings saved", response.Message);
+            await MessageDialog.Show(this, "Settings saved", response.Message);
             Close();
         }
         finally

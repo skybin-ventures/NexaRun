@@ -1,14 +1,18 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NexaRun.Tray.Views.MessageDialog"
-        Width="400" Height="180"
+        Width="420"
+        MinHeight="140"
+        SizeToContent="Height"
         CanResize="False"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterOwner">
 
   <StackPanel Margin="20" Spacing="10">
-    <TextBlock x:Name="HeadingText" FontWeight="Bold" FontSize="14" />
-    <TextBlock x:Name="BodyText" TextWrapping="Wrap" Foreground="Gray" />
-    <Button x:Name="OkBtn" Content="OK" HorizontalAlignment="Right" Margin="0 12 0 0" MinWidth="80" />
+    <TextBlock x:Name="HeadingText" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" />
+    <TextBlock x:Name="BodyText" TextWrapping="Wrap"
+               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+    <Button x:Name="OkBtn" Content="OK" HorizontalAlignment="Right" Margin="0 12 0 0"
+            MinWidth="80" IsDefault="True" IsCancel="True" Classes="accent" />
   </StackPanel>
 
 </Window>

@@ -1,7 +1,6 @@
 using System.CommandLine;
 using NexaRun.Cli;
 using NexaRun.Shared.Ipc;
-using NexaRun.Shared.Models;
 
 namespace NexaRun.Cli.Commands;
 
@@ -9,8 +8,11 @@ public static class DeleteCommand
 {
     public static Command Build(IpcClient client)
     {
-        var targetArg = CliCommands.TargetArgument("delete");
-        var cmd = new Command("delete", "Remove a process from the managed list by id or name") { targetArg };
+        var targetArg = new Argument<string>("id|name|all")
+        {
+            Description = "Process id, name, or 'all'"
+        };
+        var cmd = new Command("delete", "Delete a process by id or name (or all)") { targetArg };
 
         cmd.SetAction(async parseResult =>
         {

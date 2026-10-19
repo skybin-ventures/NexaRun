@@ -14,7 +14,7 @@ try
 {
     var builder = Host.CreateApplicationBuilder(args);
 
-    builder.Services.AddWindowsService(options => options.ServiceName = "NexaRun Daemon");
+    builder.Services.AddWindowsService(options => options.ServiceName = "NexaRunDaemon");
     builder.Services.AddSystemd();
     builder.Services.AddSerilog();
     builder.Services.AddSingleton<ProcessAlertService>();
