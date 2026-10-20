@@ -81,18 +81,19 @@ nexarun start dotnet --name api --args "run" --cwd C:\Api
 
 ```powershell
 nexarun import <file.json> [--only <name>] [--start]
-nexarun import --from-pm2 [--only <name>] [--start]
+nexarun import C:\TEMP\dump.pm2 [--only <name>] [--start]
+nexarun import --from-pm2 C:\TEMP\dump.pm2 [--only <name>] [--start]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--from-pm2` | Import currently **online** PM2 apps (requires `pm2` on PATH). Exactly one of file or `--from-pm2`. |
+| `--from-pm2` | Treat `<file>` as a PM2 `dump.pm2` (path required). |
 | `--only <name>` | Import only this app name (does not start unless `--start`) |
 | `--start` | Start processes after importing |
 
-Default is register/update definitions only (stopped). Online apps keep running until restarted — definitions update under them.
+Default is register/update definitions only (stopped).
 
-**`--from-pm2`:** uses `pm2 jlist` to find online apps, then enriches definitions from `%PM2_HOME%\dump.pm2` or `%USERPROFILE%\.pm2\dump.pm2` when present (`pm2 save`). Does not start apps unless `--start`. Stop PM2-managed instances before starting them in NexaRun to avoid port duplicates. Unsupported from PM2: `instances` / cluster, `watch`, `cron_restart`, PID adoption.
+**PM2 dump only:** paths ending in `.pm2` (e.g. `C:\TEMP\dump.pm2` from prod `pm2 save`) import saved apps — no local `pm2` / `jlist`. Tray **Import from PM2…** opens a dump file picker. Unsupported from PM2: `instances` / cluster, `watch`, `cron_restart`, PID adoption.
 
 Native JSON fields: `name`, `script`, `arguments`, `workingDirectory`, `autoRestart`, `maxRestartAttempts`, log paths, `environment`, `url`.
 

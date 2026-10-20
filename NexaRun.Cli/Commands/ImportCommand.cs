@@ -12,13 +12,13 @@ public static class ImportCommand
     {
         var fileArg = new Argument<string?>("file")
         {
-            Description = "Path to nexarun-processes.json (or any NexaRun export .json). Omit when using --from-pm2.",
+            Description = "Path to nexarun-processes.json, or a PM2 dump.pm2 file.",
             Arity = ArgumentArity.ZeroOrOne
         };
 
         var fromPm2Opt = new Option<bool>("--from-pm2")
         {
-            Description = "Import currently online PM2 apps (enriches from dump.pm2 when available)"
+            Description = "Treat <file> as a PM2 dump.pm2 (required with this flag)."
         };
 
         var onlyOpt = new Option<string?>("--only")
@@ -31,7 +31,7 @@ public static class ImportCommand
             Description = "Start processes after importing them"
         };
 
-        var cmd = new Command("import", "Import processes from a JSON file or from live PM2")
+        var cmd = new Command("import", "Import processes from a JSON file or PM2 dump.pm2")
         {
             fileArg, fromPm2Opt, onlyOpt, startOpt
         };
@@ -44,12 +44,20 @@ public static class ImportCommand
             var start = parseResult.GetValue(startOpt);
 
             var hasFile = !string.IsNullOrWhiteSpace(file);
-            if (fromPm2 == hasFile)
+            if (!hasFile)
             {
                 AnsiConsole.MarkupLine(
                     fromPm2
-                        ? "[red]Specify either a JSON file or --from-pm2, not both.[/]"
-                        : "[red]Specify a JSON file or --from-pm2.[/]");
+                        ? "[red]Specify a dump.pm2 path: nexarun import --from-pm2 C:\\TEMP\\dump.pm2[/]"
+                        : "[red]Specify a JSON or dump.pm2 file.[/]");
+                return 1;
+            }
+
+            var isDumpFile = fromPm2 || Pm2LiveImport.LooksLikeDumpPath(file!);
+            if (fromPm2 && !Pm2LiveImport.LooksLikeDumpPath(file!))
+            {
+                AnsiConsole.MarkupLine(
+                    "[red]With --from-pm2, <file> must be a dump.pm2 path.[/]");
                 return 1;
             }
 
@@ -58,9 +66,9 @@ public static class ImportCommand
                 List<StartOptions> options;
                 string? clientSummary = null;
 
-                if (fromPm2)
+                if (isDumpFile)
                 {
-                    var result = Pm2LiveImport.ReadOnline(only);
+                    var result = Pm2LiveImport.ReadDumpFile(file!, only);
                     options = result.Options;
                     clientSummary = result.Summary;
                 }

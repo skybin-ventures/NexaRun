@@ -93,7 +93,7 @@ Click the NexaRun icon in the system tray to get started. Right-click for the me
 | Menu item | Action |
 |---|---|
 | **Import JSON…** | Pick a `.json` file and register processes (does not start them; use Start in Processes) |
-| **Import from PM2…** | Register currently online PM2 apps (definitions only; stop PM2 before Start to avoid duplicates) |
+| **Import from PM2…** | Pick a `dump.pm2` file and register apps (definitions only) |
 | **Settings…** | Recovery interval, AWS SES email (API or SMTP), From/To addresses |
 | **Add Process → Import JSON…** | Same import from the Add Process window |
 | **Export JSON…** | Save definitions for another machine |
@@ -196,16 +196,16 @@ nexarun start python --name bot --args "app.py" --cwd "C:\Projects\bot"
 
 ### `nexarun import`
 
-Import processes from a JSON file or from currently online PM2 apps. See [Process JSON](#process-json-nexarun-processesjson) below.
+Import processes from a JSON file or a PM2 `dump.pm2`. See [Process JSON](#process-json-nexarun-processesjson) below.
 
 ```powershell
 nexarun import <file.json> [options]
-nexarun import --from-pm2 [options]
+nexarun import --from-pm2 <dump.pm2> [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--from-pm2` | Import online PM2 apps (`pm2 jlist` + optional `dump.pm2` enrichment) |
+| `--from-pm2` | Treat `<file>` as a PM2 `dump.pm2` (path required) |
 | `--only <name>` | Import only this app name |
 | `--start` | Start processes after importing them |
 
@@ -213,8 +213,9 @@ nexarun import --from-pm2 [options]
 nexarun import nexarun-processes.json
 nexarun import C:\deploy\processes.json --only api
 nexarun import nexarun-processes.json --start
-nexarun import --from-pm2
-nexarun import --from-pm2 --only api
+nexarun import C:\TEMP\dump.pm2
+nexarun import --from-pm2 C:\TEMP\dump.pm2
+nexarun import --from-pm2 C:\TEMP\dump.pm2 --only api
 ```
 
 ### `nexarun list`
@@ -341,7 +342,7 @@ Import/export uses **JSON only** (`nexarun-processes.json`). Example in the repo
 
 **PM2 ecosystem subset:** when importing JSON you may also use `args`, `cwd`, `env`, `max_restarts`, `autorestart`, `error_file`, `out_file`, `log_file`. Unsupported: `instances`, `exec_mode`, `watch`, `cron_restart`, and `.js` ecosystem files.
 
-**Import live PM2 apps:** `nexarun import --from-pm2` (or tray **Import from PM2…**) reads online processes via `pm2 jlist` and prefers saved definitions from `dump.pm2` when available. Registers only (use `--start` or Start in Processes explicitly). Requires `pm2` on PATH for the user running the CLI/tray. Cluster/`instances`, watch, and cron are not imported as NexaRun features.
+**Import PM2 dump:** `nexarun import C:\TEMP\dump.pm2` (or `--from-pm2` with that path; tray **Import from PM2…** file picker) imports saved apps from a `dump.pm2` — no local `pm2` / live `jlist`. Registers only unless `--start`. Cluster/`instances`, watch, and cron are not imported as NexaRun features.
 
 ---
 

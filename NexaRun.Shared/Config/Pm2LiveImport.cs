@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NexaRun.Shared.Models;
@@ -16,7 +14,7 @@ public sealed class Pm2LiveImportResult
 }
 
 /// <summary>
-/// Imports currently online PM2 apps via <c>pm2 jlist</c>, optionally enriching definitions from dump.pm2.
+/// Imports PM2 apps from a <c>dump.pm2</c> file (no local <c>pm2</c> required).
 /// </summary>
 public static class Pm2LiveImport
 {
@@ -33,83 +31,57 @@ public static class Pm2LiveImport
         "windowsHide", "username", "NODE_APP_INSTANCE"
     };
 
-    public static Pm2LiveImportResult ReadOnline(string? onlyApp = null)
+    public static bool LooksLikeDumpPath(string path) =>
+        path.EndsWith(".pm2", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Import saved apps from a PM2 <c>dump.pm2</c> file.</summary>
+    public static Pm2LiveImportResult ReadDumpFile(string path, string? onlyApp = null)
     {
-        var jlistJson = RunPm2Jlist();
-        var dumpJson = TryReadDumpFile();
-        var result = FromJlistAndDump(jlistJson, dumpJson);
+        if (string.IsNullOrWhiteSpace(path))
+            throw new InvalidOperationException("Dump file path is required.");
 
-        if (string.IsNullOrWhiteSpace(onlyApp))
-            return result;
+        var full = Path.GetFullPath(path);
+        if (!File.Exists(full))
+            throw new InvalidOperationException($"Dump file not found: {full}");
 
-        var filtered = result.Options
-            .Where(o => string.Equals(o.Name, onlyApp, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (filtered.Count == 0)
-            throw new InvalidOperationException($"No online PM2 app named '{onlyApp}'.");
-
-        return new Pm2LiveImportResult
-        {
-            Options = filtered,
-            Summary = $"Mapped 1 online app ('{filtered[0].Name}') from PM2.",
-            EnrichedFromDump = Math.Min(1, result.EnrichedFromDump),
-            ClusterDuplicatesSkipped = 0
-        };
-    }
-
-    /// <summary>Pure merge/mapping API for tests (no process spawn).</summary>
-    public static Pm2LiveImportResult FromJlistAndDump(string jlistJson, string? dumpJson)
-    {
-        if (string.IsNullOrWhiteSpace(jlistJson))
-            throw new InvalidOperationException("PM2 did not return a process list.");
-
-        List<Pm2ProcessEntry> jlist;
+        string dumpJson;
         try
         {
-            jlist = JsonSerializer.Deserialize<List<Pm2ProcessEntry>>(jlistJson, JsonOptions)
-                    ?? throw new InvalidOperationException("Unexpected pm2 jlist output.");
+            dumpJson = File.ReadAllText(full);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Could not read dump file: {full}", ex);
+        }
+
+        return FilterOnly(FromDump(dumpJson), onlyApp);
+    }
+
+    /// <summary>Pure dump mapping API for tests (no file I/O).</summary>
+    public static Pm2LiveImportResult FromDump(string dumpJson)
+    {
+        if (string.IsNullOrWhiteSpace(dumpJson))
+            throw new InvalidOperationException("PM2 dump was empty.");
+
+        List<Pm2ProcessEntry> dump;
+        try
+        {
+            dump = JsonSerializer.Deserialize<List<Pm2ProcessEntry>>(dumpJson, JsonOptions)
+                   ?? throw new InvalidOperationException("Unexpected PM2 dump format.");
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException("Unexpected pm2 jlist output.", ex);
-        }
-
-        Dictionary<string, Pm2ProcessEntry>? dumpByName = null;
-        if (!string.IsNullOrWhiteSpace(dumpJson))
-        {
-            try
-            {
-                var dump = JsonSerializer.Deserialize<List<Pm2ProcessEntry>>(dumpJson, JsonOptions);
-                if (dump != null)
-                {
-                    dumpByName = new Dictionary<string, Pm2ProcessEntry>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var entry in dump)
-                    {
-                        var name = entry.ResolveName();
-                        if (string.IsNullOrWhiteSpace(name) || dumpByName.ContainsKey(name))
-                            continue;
-                        dumpByName[name] = entry;
-                    }
-                }
-            }
-            catch (JsonException)
-            {
-                dumpByName = null;
-            }
+            throw new InvalidOperationException("Unexpected PM2 dump format.", ex);
         }
 
         var options = new List<StartOptions>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var enrichedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var clusterSkipped = 0;
 
-        foreach (var entry in jlist)
+        foreach (var entry in dump)
         {
             var name = entry.ResolveName();
             if (string.IsNullOrWhiteSpace(name) || IsInternalPm2(name, entry))
-                continue;
-
-            if (!entry.IsOnline())
                 continue;
 
             if (!seen.Add(name))
@@ -118,23 +90,12 @@ public static class Pm2LiveImport
                 continue;
             }
 
-            Pm2ProcessEntry source = entry;
-            if (dumpByName != null && dumpByName.TryGetValue(name, out var dumpEntry))
-            {
-                source = dumpEntry;
-                enrichedNames.Add(name);
-            }
-
-            options.Add(MapToStartOptions(name, source));
+            options.Add(MapToStartOptions(name, entry));
         }
 
         if (options.Count == 0)
-            throw new InvalidOperationException("No running PM2 apps to import.");
+            throw new InvalidOperationException("No apps found in PM2 dump to import.");
 
-        var enriched = enrichedNames.Count;
-        var dumpNote = dumpByName == null
-            ? "definitions from jlist only"
-            : $"{enriched} enriched from dump.pm2";
         var clusterNote = clusterSkipped > 0
             ? $"; skipped {clusterSkipped} cluster duplicate(s)"
             : string.Empty;
@@ -142,8 +103,8 @@ public static class Pm2LiveImport
         return new Pm2LiveImportResult
         {
             Options = options,
-            Summary = $"Mapped {options.Count} online app(s); {dumpNote}{clusterNote}.",
-            EnrichedFromDump = enriched,
+            Summary = $"Mapped {options.Count} app(s) from dump.pm2{clusterNote}.",
+            EnrichedFromDump = options.Count,
             ClusterDuplicatesSkipped = clusterSkipped
         };
     }
@@ -158,86 +119,24 @@ public static class Pm2LiveImport
         return Path.Combine(profile, ".pm2", "dump.pm2");
     }
 
-    private static string? TryReadDumpFile()
+    private static Pm2LiveImportResult FilterOnly(Pm2LiveImportResult result, string? onlyApp)
     {
-        try
-        {
-            var path = GetDumpPath();
-            return File.Exists(path) ? File.ReadAllText(path) : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+        if (string.IsNullOrWhiteSpace(onlyApp))
+            return result;
 
-    private static string RunPm2Jlist()
-    {
-        ProcessStartInfo psi;
-        try
-        {
-            psi = ProcessLaunchHelper.CreateStartInfo(
-                "pm2",
-                "jlist",
-                Environment.CurrentDirectory,
-                redirectOutput: true);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                "PM2 not found. Install PM2 and ensure it is on PATH.", ex);
-        }
+        var filtered = result.Options
+            .Where(o => string.Equals(o.Name, onlyApp, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (filtered.Count == 0)
+            throw new InvalidOperationException($"No app in PM2 dump named '{onlyApp}'.");
 
-        using var process = new Process { StartInfo = psi };
-        var stdout = new StringBuilder();
-        var stderr = new StringBuilder();
-        process.OutputDataReceived += (_, e) =>
+        return new Pm2LiveImportResult
         {
-            if (e.Data != null) stdout.AppendLine(e.Data);
+            Options = filtered,
+            Summary = $"Mapped 1 app ('{filtered[0].Name}') from dump.pm2.",
+            EnrichedFromDump = Math.Min(1, result.EnrichedFromDump),
+            ClusterDuplicatesSkipped = 0
         };
-        process.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data != null) stderr.AppendLine(e.Data);
-        };
-
-        try
-        {
-            if (!process.Start())
-                throw new InvalidOperationException(
-                    "PM2 not found. Install PM2 and ensure it is on PATH.");
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            throw new InvalidOperationException(
-                "PM2 not found. Install PM2 and ensure it is on PATH.", ex);
-        }
-
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        if (!process.WaitForExit(15_000))
-        {
-            try { process.Kill(entireProcessTree: true); } catch { /* ignore */ }
-            throw new InvalidOperationException("PM2 did not respond in time.");
-        }
-
-        // Ensure async readers finish
-        process.WaitForExit();
-
-        var output = stdout.ToString().Trim();
-        if (process.ExitCode != 0 && string.IsNullOrWhiteSpace(output))
-        {
-            var err = stderr.ToString().Trim();
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(err)
-                    ? "PM2 did not return a process list."
-                    : $"PM2 did not return a process list: {err}");
-        }
-
-        if (string.IsNullOrWhiteSpace(output))
-            throw new InvalidOperationException("PM2 did not return a process list.");
-
-        return output;
     }
 
     private static bool IsInternalPm2(string name, Pm2ProcessEntry entry)
@@ -410,21 +309,12 @@ public static class Pm2LiveImport
                 return Name;
             return Pm2Env?.Name;
         }
-
-        public bool IsOnline()
-        {
-            var status = Pm2Env?.Status;
-            return string.Equals(status, "online", StringComparison.OrdinalIgnoreCase);
-        }
     }
 
     private sealed class Pm2Env
     {
         [JsonPropertyName("name")]
         public string? Name { get; set; }
-
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
 
         [JsonPropertyName("pm_exec_path")]
         public string? PmExecPath { get; set; }

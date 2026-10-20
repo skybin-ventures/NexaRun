@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using NexaRun.Shared;
+using NexaRun.Shared.Config;
 using NexaRun.Tray.Views;
 
 namespace NexaRun.Tray.Services;
@@ -34,19 +35,18 @@ public static class TrayImportExportActions
 
     public static async Task ImportFromPm2(Window? owner, TrayConfigService config, Func<Task>? onSuccess = null)
     {
-        var confirmed = await ConfirmDialog.Show(
+        var path = await TrayFileDialogs.PickOpenFile(
             owner,
-            "Import from PM2",
-            "Register currently online PM2 apps in NexaRun without starting them.\n\n" +
-            "Stop those apps in PM2 (or stop PM2) before starting them here, or you may run duplicates on the same ports.",
-            "Import");
+            "Import PM2 dump.pm2",
+            Pm2LiveImport.GetDumpPath(),
+            "PM2 dump|*.pm2",
+            "All files|*.*");
 
-        if (!confirmed)
-            return;
+        if (path == null) return;
 
         try
         {
-            var (ok, msg) = await config.ImportFromPm2(start: false);
+            var (ok, msg) = await config.ImportFromPm2Dump(path, start: false);
             await MessageDialog.Show(owner, ok ? "Import complete" : "Import failed", msg);
             if (ok && onSuccess != null)
                 await onSuccess();

@@ -12,9 +12,9 @@ public class TrayConfigService(IpcClient ipc)
         return await SendImport(options, start);
     }
 
-    public async Task<(bool success, string message)> ImportFromPm2(bool start = false)
+    public async Task<(bool success, string message)> ImportFromPm2Dump(string path, bool start = false)
     {
-        var result = Pm2LiveImport.ReadOnline();
+        var result = Pm2LiveImport.ReadDumpFile(path);
         var (ok, msg) = await SendImport(result.Options, start);
         if (!ok)
             return (false, msg);

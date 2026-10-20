@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-20
+- PM2 import: read apps from dump.pm2 only (no live pm2 jlist); CLI/tray accept dump path; simplify tests and docs
+
 ## 2026-10-19 — v1.0.12
 - CI: create `installer\output` before resolving its path in `build.ps1` (fresh CI checkout has no output dir)
 - CI: generate installer icon under PowerShell 7 via `System.Drawing.Common` (no C# `Add-Type` that failed on GitHub Actions)
@@ -9,7 +12,7 @@
 - CI: release body comes from the latest `CHANGELOG.md` section (`installer\Get-ChangelogNotes.ps1`); top heading is labeled `— vX.Y.Z` and committed with the version bump
 - CI: version bump uses two-digit patch/minor rollover (`installer\Get-NextVersion.ps1`: `1.0.99` → `1.1.0`, `1.99.99` → `2.0.0`)
 - Docs: README Releasing section (Actions trigger + required workflow permissions / branch-protection notes)
-- Feature: import currently online PM2 apps (`nexarun import --from-pm2`, tray **Import from PM2…**); enriches from `dump.pm2` when present; register-only by default
+- Feature: import PM2 apps from `dump.pm2` only (`nexarun import C:\TEMP\dump.pm2` / `--from-pm2 <dump.pm2>`, tray **Import from PM2…** file picker); register-only by default; no live `pm2 jlist`
 - Lifecycle: fix PID reattach on daemon Load (preserve + fingerprint); DesiredStatus boot restore; monitor AutoRestart=false exits; cancel crash-restart on user stop; soft-then-force stop (8s); data dir `%ProgramData%\NexaRun`; pipe ACL for Interactive users
 - CLI: script-path `start`, incremental `logs --follow`, `describe` / `history` / `save` / `resurrect` / `daemon status` / `stop all` / `delete all`; exit codes 2/3; settle defaults 2s; PM2 JSON field subset on import
 - Tray: Processes window search/status filter, empty/error states, scroll-preserving refresh; shared log viewer; soft-then-force stop UX across dialogs
