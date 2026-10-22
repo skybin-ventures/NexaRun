@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "exportedAt": "2026-10-22T08:18:27.193Z",
+  "exportedFrom": "dump.pm2",
+  "apps": [
+    {
+      "name": "salesflow-web",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\salesflow.sveylo.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\salesflow.sveylo.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\salesflow-web-out-1.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\salesflow-web-error-1.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3129",
+        "API_URL": "http://127.0.0.1:7062"
+      }
+    },
+    {
+      "name": "perfex-web",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\support.sveylo.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\support.sveylo.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\perfex-web-out-12.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\perfex-web-error-12.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3123",
+        "NEXT_PUBLIC_APP_URL": "https://support.sveylo.com",
+        "NEXT_PUBLIC_API_URL": "https://support.sveylo.com/api",
+        "API_BASE_URL": "http://127.0.0.1:7055/api"
+      }
+    },
+    {
+      "name": "sveylo-web",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\beta.sveylo.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\beta.sveylo.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\sveylo-web-out-13.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\sveylo-web-error-13.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3122",
+        "API_BASE_URL": "http://127.0.0.1:7054/api/v1"
+      }
+    },
+    {
+      "name": "perfex-api",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\support.sveylo.com\\api\\dist\\main.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\support.sveylo.com\\api",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\perfex-api-out-18.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\perfex-api-error-18.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "7055"
+      }
+    },
+    {
+      "name": "reachly-web-beta",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\beta.reachly.in\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\beta.reachly.in\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\reachly-web-beta-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\reachly-web-beta-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3121",
+        "GATEWAY_URL": "https://gateway.skybin.io",
+        "NEXT_PUBLIC_SITE_URL": "https://beta.reachly.in",
+        "APP_URL": "https://beta.reachly.in",
+        "REACHLY_GATEWAY_PREFIX": "/reachly-beta"
+      }
+    },
+    {
+      "name": "skybin-ventures-website",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\skybin.io\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\skybin.io\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\skybin-ventures-website-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\skybin-ventures-website-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3102"
+      }
+    },
+    {
+      "name": "reachly-marketing-prod",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\reachly.in\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\reachly.in\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\reachly-marketing-prod-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\reachly-marketing-prod-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4000",
+        "NEXT_PUBLIC_SITE_URL": "https://reachly.in",
+        "NEXT_PUBLIC_APP_URL": "https://beta.reachly.in"
+      }
+    },
+    {
+      "name": "skybin-company-website",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\skybin.co\\node_modules\\next\\dist\\bin\\next start -p 3002",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\skybin.co",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\skybin-company-website-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\skybin-company-website-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "name": "duez-marketing",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\duez.online\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\duez.online\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\inetpub\\wwwroot\\duez.online\\TEMP\\logs\\duez-marketing-out.log",
+      "errorLogFile": "C:\\inetpub\\wwwroot\\duez.online\\TEMP\\logs\\duez-marketing-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4005",
+        "NEXT_PUBLIC_SITE_URL": "https://duez.online",
+        "NEXT_PUBLIC_APP_URL": "https://beta.duez.online"
+      }
+    },
+    {
+      "name": "formfuse-marketing",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\formfuse.in\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\formfuse.in\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\formfuse-marketing-out-46.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\formfuse-marketing-error-46.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4003"
+      }
+    },
+    {
+      "name": "aastha-marketing",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\aastha.cloud\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\aastha.cloud\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\aastha-marketing-out-48.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\aastha-marketing-error-48.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4006"
+      }
+    },
+    {
+      "name": "clientcentral-web",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\support.skybin.io\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\support.skybin.io\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\clientcentral-web-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\clientcentral-web-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "HOSTNAME": "0.0.0.0",
+        "PORT": "3124",
+        "AWS_REGION": "ap-south-1",
+        "NEXT_PUBLIC_SITE_URL": "https://support.skybin.io",
+        "NEXT_PUBLIC_API_URL": "https://support.skybin.io/api"
+      }
+    },
+    {
+      "name": "sveylo-api",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\beta.sveylo.com\\api\\dist\\main.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\beta.sveylo.com\\api",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\sveylo-api-out-57.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\sveylo-api-error-57.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "API_PORT": "7054"
+      }
+    },
+    {
+      "name": "salesflow-api",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\salesflowapi.sveylo.com\\dist\\main.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\salesflowapi.sveylo.com",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "maxMemoryMb": 512,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\salesflow-api-out-60.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\salesflow-api-error-60.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "7062"
+      }
+    },
+    {
+      "name": "caelohr-platform",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\admin.beta.caelohr.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\admin.beta.caelohr.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-platform-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-platform-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3127",
+        "AWS_REGION": "ap-south-1",
+        "API_URL": "https://api.beta.caelohr.com",
+        "APP_URL": "https://admin.beta.caelohr.com"
+      }
+    },
+    {
+      "name": "caelohr-marketing",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\caelohr.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\caelohr.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-marketing-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-marketing-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4001"
+      }
+    },
+    {
+      "name": "caelohr-app",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\beta.caelohr.com\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\beta.caelohr.com\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-app-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\caelohr-app-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3116",
+        "AWS_REGION": "ap-south-1",
+        "API_URL": "https://api.beta.caelohr.com",
+        "BRAND_THEME_PATH": "C:\\inetpub\\wwwroot\\beta.caelohr.com\\theme.json",
+        "BRAND_ASSETS_PATH": "C:\\inetpub\\wwwroot\\beta.caelohr.com\\brand"
+      }
+    },
+    {
+      "name": "keysentry-marketing-prod",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\keysentry.in\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\keysentry.in\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\keysentry-marketing-prod-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\keysentry-marketing-prod-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "4002",
+        "NEXT_PUBLIC_SITE_URL": "https://keysentry.in",
+        "NEXT_PUBLIC_APP_URL": "https://beta.keysentry.in"
+      }
+    },
+    {
+      "name": "keysentry-app",
+      "script": "node",
+      "arguments": "C:\\inetpub\\wwwroot\\beta.keysentry.in\\.next\\standalone\\server.js",
+      "workingDirectory": "C:\\inetpub\\wwwroot\\beta.keysentry.in\\.next\\standalone",
+      "autoRestart": true,
+      "maxRestartAttempts": 3,
+      "outLogFile": "C:\\ProgramData\\pm2\\home\\logs\\keysentry-app-out.log",
+      "errorLogFile": "C:\\ProgramData\\pm2\\home\\logs\\keysentry-app-error.log",
+      "logTimestamps": true,
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3125",
+        "API_URL": "https://beta.keysentry.in/api"
+      }
+    }
+  ]
+}

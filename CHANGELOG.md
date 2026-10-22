@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-22
+- CLI: `nexarun start all` / `start-all` — start every stopped/errored process (progress bar, settle on last only)
+- CLI: `nexarun delete-all` alias (same as `delete all` / `clear-all`)
+- Daemon: `StartAllProcesses` + IPC `start-all`; `StartExisting` honors `SettleAfterStart`
+- Tray: Win32 file dialog fallback when import/export runs from the tray menu with no window; defer actions until the menu dismisses
+
 ## 2026-10-20
 - PM2 import: read apps from dump.pm2 only (no live pm2 jlist); CLI/tray accept dump path; simplify tests and docs
 

@@ -7,12 +7,14 @@ var client = new IpcClient();
 var root = new RootCommand("NexaRun — process manager for Windows")
 {
     StartCommand.Build(client),
+    StartAllCommand.Build(client),
     ImportCommand.Build(client),
     StopCommand.Build(client),
     RestartCommand.Build(client),
     RestartAllCommand.Build(client),
     ClearAllCommand.Build(client),
     DeleteCommand.Build(client),
+    DeleteAllCommand.Build(client),
     ListCommand.Build(client),
     DescribeCommand.Build(client),
     LogsCommand.Build(client),

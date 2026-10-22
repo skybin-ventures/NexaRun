@@ -96,14 +96,17 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
             {
                 "start" when request.Options != null &&
                     !string.IsNullOrWhiteSpace(request.Options.ExecutablePath) => await HandleStart(request.Options),
+                "start" when IsAllTarget(request.ProcessName) => await HandleStartAll(),
+                "start-all" => await HandleStartAll(),
                 "start" when !string.IsNullOrWhiteSpace(request.ProcessName) =>
-                    await HandleStartExisting(request.ProcessName!),
+                    await HandleStartExisting(request.ProcessName!, request.SettleAfterStart),
                 "update" when request.Options != null => await HandleUpdate(request.Options),
                 "stop" when IsAllTarget(request.ProcessName) => await HandleStopAll(),
                 "stop" => await HandleStop(request.ProcessName),
                 "restart" => await HandleRestart(request.ProcessName, request.SettleAfterStart),
                 "restart-all" => await HandleRestartAll(),
                 "delete" when IsAllTarget(request.ProcessName) => await HandleDeleteAll(),
+                "delete-all" => await HandleDeleteAll(),
                 "delete" => await HandleDelete(request.ProcessName),
                 "clear-all" => await HandleClearAll(),
                 "list" => await HandleList(),
@@ -138,15 +141,22 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
         };
     }
 
-    private async Task<IpcResponse> HandleStartExisting(string target)
+    private async Task<IpcResponse> HandleStartExisting(string target, bool settleAfterStart)
     {
-        var (success, message, process) = await processManager.StartExisting(target);
+        var (success, message, process) = await processManager.StartExisting(target, settleAfterStart);
         return new IpcResponse
         {
             Success = success,
             Message = message,
             Processes = process != null ? [process] : null
         };
+    }
+
+    private async Task<IpcResponse> HandleStartAll()
+    {
+        var (success, message) = await processManager.StartAllProcesses();
+        var processes = await processManager.GetAll();
+        return new IpcResponse { Success = success, Message = message, Processes = processes };
     }
 
     private static bool IsAllTarget(string? target) =>

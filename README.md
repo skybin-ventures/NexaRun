@@ -141,12 +141,14 @@ Daemon is not running. Start it with: nexarun daemon start
 
 ```text
 nexarun
-├── start <id|name|script> Start saved process or new script/executable
+├── start <id|name|all|script> Start saved process, all stopped, or new script
+├── start-all              Start every stopped/errored process
 ├── import <file.json>     Import processes from JSON
 ├── stop <id|name|all>     Stop a process (or all)
-├── restart <id|name>      Restart a process
+├── restart <id|name|all>  Restart a process (or all)
 ├── restart-all            Restart every process
 ├── delete <id|name|all>   Remove from managed list (or all)
+├── delete-all             Stop and remove every process
 ├── clear-all              Stop and clear every process
 ├── list                   List all processes (shows id)
 ├── describe <id|name>     Full process details (JSON)
@@ -235,10 +237,14 @@ nexarun list
 nexarun stop 0
 nexarun stop all
 nexarun restart 3
+nexarun restart all
 nexarun delete myapi
 nexarun delete all
+nexarun delete-all
 nexarun start 0          # start a stopped saved process by id
 nexarun start myapi      # start by name
+nexarun start all        # start every stopped/errored process
+nexarun start-all
 nexarun describe myapi
 nexarun save
 nexarun resurrect
@@ -281,13 +287,13 @@ Starts or stops the Windows service `NexaRunDaemon` (or the dev daemon exe when 
 
 | Command | Example |
 |---------|---------|
-| Start | `nexarun start .\app.js` or `nexarun start dotnet --name api --args "run" --cwd C:\Api` |
+| Start | `nexarun start .\app.js` or `nexarun start all` / `start-all` |
 | Import | `nexarun import nexarun-processes.json` |
 | List | `nexarun list` |
 | Describe | `nexarun describe api` |
 | Stop | `nexarun stop 0` / `nexarun stop all` |
-| Restart | `nexarun restart 0` |
-| Delete | `nexarun delete 0` / `nexarun delete all` |
+| Restart | `nexarun restart 0` / `nexarun restart all` |
+| Delete | `nexarun delete 0` / `nexarun delete all` / `delete-all` |
 | Save / resurrect | `nexarun save` / `nexarun resurrect` |
 | Logs | `nexarun logs 0 --follow` |
 | Daemon | `nexarun daemon status` |

@@ -60,9 +60,9 @@ public class App : Application
         AddMenuItem(menu, "Processes", (_, _) => ShowMainWindow());
         AddMenuItem(menu, "Dashboard", (_, _) => ShowDashboard());
         AddMenuItem(menu, "Add Process", (_, _) => ShowAddProcess());
-        AddMenuItem(menu, "Import JSON...", async (_, _) => await ImportJson());
-        AddMenuItem(menu, "Import from PM2...", async (_, _) => await ImportPm2());
-        AddMenuItem(menu, "Export JSON...", async (_, _) => await ExportJson());
+        AddMenuItem(menu, "Import JSON...", (_, _) => RunTrayAction(ImportJson));
+        AddMenuItem(menu, "Import from PM2...", (_, _) => RunTrayAction(ImportPm2));
+        AddMenuItem(menu, "Export JSON...", (_, _) => RunTrayAction(ExportJson));
         AddMenuItem(menu, "Settings...", (_, _) => ShowSettings());
 
         menu.Items.Add(new NativeMenuItemSeparator());
@@ -97,6 +97,25 @@ public class App : Application
         var item = new NativeMenuItem(header);
         item.Click += click;
         menu.Items.Add(item);
+    }
+
+    /// <summary>
+    /// Native tray menus steal focus; run file dialogs after the menu dismisses on the UI thread.
+    /// </summary>
+    private static void RunTrayAction(Func<Task> action)
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                await action();
+            }
+            catch (Exception ex)
+            {
+                TrayCrashReporter.Report("TrayMenuAction", ex, isTerminating: false);
+                await MessageDialog.Show(null, "NexaRun", ex.Message);
+            }
+        }, DispatcherPriority.Background);
     }
 
     private async Task ImportJson()

@@ -35,17 +35,17 @@ public static class TrayImportExportActions
 
     public static async Task ImportFromPm2(Window? owner, TrayConfigService config, Func<Task>? onSuccess = null)
     {
-        var path = await TrayFileDialogs.PickOpenFile(
-            owner,
-            "Import PM2 dump.pm2",
-            Pm2LiveImport.GetDumpPath(),
-            "PM2 dump|*.pm2",
-            "All files|*.*");
-
-        if (path == null) return;
-
         try
         {
+            var path = await TrayFileDialogs.PickOpenFile(
+                owner,
+                "Import PM2 dump.pm2",
+                Pm2LiveImport.GetDumpPath(),
+                "PM2 dump|*.pm2",
+                "All files|*.*");
+
+            if (path == null) return;
+
             var (ok, msg) = await config.ImportFromPm2Dump(path, start: false);
             await MessageDialog.Show(owner, ok ? "Import complete" : "Import failed", msg);
             if (ok && onSuccess != null)

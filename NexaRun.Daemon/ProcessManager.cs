@@ -289,7 +289,10 @@ public class ProcessManager
         finally { _lock.Release(); }
     }
 
-    public async Task<(bool success, string message, NexaProcess? process)> StartExisting(string target)
+    public Task<(bool success, string message, NexaProcess? process)> StartExisting(string target) =>
+        StartExisting(target, settleAfterStart: true);
+
+    public async Task<(bool success, string message, NexaProcess? process)> StartExisting(string target, bool settleAfterStart)
     {
         await _lock.WaitAsync();
         NexaProcess? p;
@@ -304,7 +307,45 @@ public class ProcessManager
         }
         finally { _lock.Release(); }
 
-        return await Start(ToStartOptions(p));
+        var result = await Start(ToStartOptions(p));
+        if (result.success && settleAfterStart)
+            await Task.Delay(ProcessDefaults.StartSettleMs);
+        return result;
+    }
+
+    public async Task<(bool success, string message)> StartAllProcesses()
+    {
+        List<string> targets;
+        await _lock.WaitAsync();
+        try
+        {
+            targets = _processes
+                .Where(p => p.Status is not (ProcessStatus.Online or ProcessStatus.Starting))
+                .OrderBy(p => p.Id)
+                .Select(p => p.Id.ToString())
+                .ToList();
+        }
+        finally { _lock.Release(); }
+
+        if (targets.Count == 0)
+            return (true, "No stopped processes to start.");
+
+        var succeeded = 0;
+        var failed = 0;
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var settleAfterStart = i == targets.Count - 1;
+            var (ok, message, _) = await StartExisting(targets[i], settleAfterStart);
+            if (ok)
+                succeeded++;
+            else
+            {
+                failed++;
+                _logger.LogWarning("Start All: failed '{Target}': {Message}", targets[i], message);
+            }
+        }
+
+        return (true, $"Start All finished: {succeeded} succeeded, {failed} failed (of {targets.Count}).");
     }
 
     public async Task<(bool success, string message)> Stop(string target)

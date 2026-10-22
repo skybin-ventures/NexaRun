@@ -49,12 +49,19 @@ public static class CliIpc
         {
             "start" when request.Options != null =>
                 $"Starting '{request.Options.Name}' (up to {startSettleSec}s settle after launch)",
+            "start" when IsAll(request.ProcessName) =>
+                $"Starting all stopped processes (~{startSettleSec}s settle between apps)",
+            "start-all" =>
+                $"Starting all stopped processes (~{startSettleSec}s settle between apps)",
             "start" =>
                 $"Starting process {request.ProcessName}",
+            "stop" when IsAll(request.ProcessName) => "Stopping all running processes",
             "stop" => $"Stopping '{request.ProcessName}'",
             "restart" => RestartStatus(request.ProcessName!),
             "restart-all" =>
                 $"Restarting all processes (~{settleSec}s per app — this can take several minutes)",
+            "delete" when IsAll(request.ProcessName) => "Stopping and deleting all processes",
+            "delete-all" => "Stopping and deleting all processes",
             "delete" => $"Deleting '{request.ProcessName}'",
             "clear-all" => "Stopping and clearing all processes",
             "import" when request.BatchOptions != null =>
@@ -83,6 +90,19 @@ public static class CliIpc
         return
             $"[{index}/{total}] id {id} '{processName}' (stop → {stopSec}s → start → {settleNote})";
     }
+
+    public static string StartAllItemStatus(int index, int total, int id, string processName, bool isLast)
+    {
+        var startSec = ProcessDefaults.StartSettleMs / 1000;
+        var settleNote = isLast
+            ? $"wait {startSec}s after start"
+            : "skip post-start wait until last app";
+        return
+            $"[{index}/{total}] id {id} '{processName}' (start → {settleNote})";
+    }
+
+    private static bool IsAll(string? target) =>
+        string.Equals(target, "all", StringComparison.OrdinalIgnoreCase);
 
     public static string ImportStatus(int count, bool startAfterImport)
     {

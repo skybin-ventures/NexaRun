@@ -22,12 +22,14 @@ Daemon is not running. Start it with: nexarun daemon start
 
 ```text
 nexarun
-├── start <id|name|script> Start saved process or new script/executable
+├── start <id|name|all|script> Start saved process, all stopped, or new script
+├── start-all              Start every stopped/errored process
 ├── import <file.json>     Import processes from JSON
 ├── stop <id|name|all>     Stop a process (or all)
-├── restart <id|name>      Restart a process
+├── restart <id|name|all>  Restart a process (or all)
 ├── restart-all            Restart every process
 ├── delete <id|name|all>   Remove from managed list (or all)
+├── delete-all             Stop and remove every process
 ├── clear-all              Stop and clear every process
 ├── list                   List all processes
 ├── describe <id|name>     Full process details (JSON)
@@ -72,8 +74,12 @@ Resolution order:
 nexarun start .\server.js --name worker
 nexarun start 0
 nexarun start myapi
+nexarun start all
+nexarun start-all
 nexarun start dotnet --name api --args "run" --cwd C:\Api
 ```
+
+`start all` / `start-all` starts every **stopped** or **errored** process one at a time (skips already online). Settle wait applies only after the last app.
 
 ---
 
@@ -109,9 +115,13 @@ Stop attempts a soft signal, waits up to **8 seconds**, then force-kills the pro
 nexarun stop myapi
 nexarun stop all
 nexarun restart 0
+nexarun restart all
 nexarun delete myapi
 nexarun delete all
+nexarun delete-all
 ```
+
+`delete all` / `delete-all` stops and removes every managed process (same effect as `clear-all`).
 
 User stop sets **DesiredStatus=Stopped** and cancels any pending crash-restart backoff.
 

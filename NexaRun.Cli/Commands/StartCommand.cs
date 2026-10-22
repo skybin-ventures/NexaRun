@@ -12,7 +12,7 @@ public static class StartCommand
     {
         var targetArg = new Argument<string>("target")
         {
-            Description = "Process id/name (start saved app) or script/executable path (register and start)"
+            Description = "Process id/name, `all` (start every stopped app), or script/executable path (register and start)"
         };
 
         var nameOpt = new Option<string?>("--name")
@@ -76,7 +76,7 @@ public static class StartCommand
             Description = "Extra arguments forwarded to the executable (after --)"
         };
 
-        var cmd = new Command("start", "Start a process by id/name (PM2-style) or register a new script/executable")
+        var cmd = new Command("start", "Start a process by id/name/all (PM2-style) or register a new script/executable")
         {
             targetArg, nameOpt, argsOpt, cwdOpt, noRestartOpt,
             maxRestartsOpt, maxCpuOpt, maxMemOpt, outLogOpt, errLogOpt, logOpt, timeOpt, forwardArgs
@@ -85,6 +85,9 @@ public static class StartCommand
         cmd.SetAction(async parseResult =>
         {
             var target = parseResult.GetValue(targetArg)!;
+            if (StartAllRunner.IsAllTarget(target))
+                return await StartAllRunner.Run(client);
+
             var forwarded = parseResult.GetValue(forwardArgs) ?? [];
             var hasOptions = WantsNewExecutable(parseResult, argsOpt, cwdOpt, nameOpt, outLogOpt, errLogOpt, logOpt,
                 noRestartOpt, maxRestartsOpt, maxCpuOpt, maxMemOpt, timeOpt) || forwarded.Length > 0;
