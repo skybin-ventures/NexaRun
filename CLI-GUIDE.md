@@ -28,11 +28,16 @@ nexarun
 ├── stop <id|name|all>     Stop a process (or all)
 ├── restart <id|name|all>  Restart a process (or all)
 ├── restart-all            Restart every process
+├── reload <id|name|all>   Graceful stop+start (brief downtime)
+├── reset <id|name|all>    Zero restart counters
+├── flush <id|name|all>    Clear log files
 ├── delete <id|name|all>   Remove from managed list (or all)
 ├── delete-all             Stop and remove every process
 ├── clear-all              Stop and clear every process
-├── list                   List all processes
+├── list [--json]          List all processes
+├── monit                  Live-refreshing process table
 ├── describe <id|name>     Full process details (JSON)
+├── env <id|name> [--json] Saved env vars (may include secrets)
 ├── logs <id|name>         Show process logs
 ├── history <id|name>      Recent run history
 ├── save                   Persist process list / desired state
@@ -69,9 +74,20 @@ Resolution order:
 | `--max-memory <mb>` | Restart if memory exceeds this MB |
 | `--log` / `--out` / `--error` | Log paths |
 | `--time` | Timestamp each log line |
+| `--env KEY=VALUE` | Environment variable (repeatable) |
+| `--ready-port <n>` | Wait until TCP `127.0.0.1:n` accepts before Online (also applies after crash relaunch) |
+| `--ready-file <path>` | Wait until file exists before Online (also after crash relaunch) |
+| `--ready-timeout <ms>` | Ready-check timeout (default **30000**) |
+| `--restart-delay <ms>` | Minimum crash-restart delay (actual = max(exponential backoff, this)) |
+| `--watch` / `--watch-path` | Restart when files change (default path: cwd). Prefer a source folder; ignores `node_modules`, `.git`, `*.log`, and process log paths |
+| `--cron-restart "m h dom mon dow"` | Scheduled restart (5-field cron, local time). When both day-of-month and day-of-week are set (neither `*`), either may match (Vixie OR) |
+
+Script paths (`.js`, `.py`, `.ps1`, `.dll`, `.cmd`/`.bat`) are wrapped with the usual interpreter under the daemon (`node`, `python`, `pwsh`/`powershell`, `dotnet`, `cmd`). Prefer absolute interpreter paths or `--env PATH=...` when the LocalSystem PATH is incomplete.
 
 ```powershell
 nexarun start .\server.js --name worker
+nexarun start .\server.js --name worker --env NODE_ENV=production --env PORT=3000
+nexarun start .\api.exe --name api --ready-port 5000
 nexarun start 0
 nexarun start myapi
 nexarun start all
@@ -86,7 +102,7 @@ nexarun start dotnet --name api --args "run" --cwd C:\Api
 ## `nexarun import`
 
 ```powershell
-nexarun import <file.json> [--only <name>] [--start]
+nexarun import <file.json> [--only <name>] [--start] [--env-name production]
 nexarun import C:\TEMP\dump.pm2 [--only <name>] [--start]
 nexarun import --from-pm2 C:\TEMP\dump.pm2 [--only <name>] [--start]
 ```
@@ -96,30 +112,49 @@ nexarun import --from-pm2 C:\TEMP\dump.pm2 [--only <name>] [--start]
 | `--from-pm2` | Treat `<file>` as a PM2 `dump.pm2` (path required). |
 | `--only <name>` | Import only this app name (does not start unless `--start`) |
 | `--start` | Start processes after importing |
+| `--env-name <name>` | JSON only: merge `env_<name>` (e.g. `production` → `env_production`) over base `env` |
 
 Default is register/update definitions only (stopped).
 
-**PM2 dump only:** paths ending in `.pm2` (e.g. `C:\TEMP\dump.pm2` from prod `pm2 save`) import saved apps — no local `pm2` / `jlist`. Tray **Import from PM2…** opens a dump file picker. Unsupported from PM2: `instances` / cluster, `watch`, `cron_restart`, PID adoption.
+**PM2 dump only:** paths ending in `.pm2` expand same-name cluster rows to named clones (`api`, `api-1`, …). No live `pm2` / `jlist`. `--env-name` is ignored for dumps.
 
-Native JSON fields: `name`, `script`, `arguments`, `workingDirectory`, `autoRestart`, `maxRestartAttempts`, log paths, `environment`, `url`.
+Native JSON fields include `instances` (named clones), `watch` / `watchPath`, `cronRestart`, ready/env/restartDelay, `interpreter` / `nodeArgs`.
 
-PM2 ecosystem **subset** aliases also accepted: `args`, `cwd`, `env`, `max_restarts`, `autorestart`, `error_file`, `out_file`, `log_file`. Not supported: `instances`, `exec_mode`, `watch`, `cron_restart`, ecosystem `.js`.
+| Capability | Native JSON | `dump.pm2` (`pm2_env`) |
+|------------|-------------|-------------------------|
+| Watch | `watch`, `watchPath` | `watch`, `watch_path` |
+| Cron | `cronRestart` | `cron_restart` |
+| Restart delay | `restartDelayMs` | `restart_delay` |
+| Ready gate | `readyPort` / `readyFile` / `readyTimeoutMs` | not invented from PM2 `wait_ready` |
+| Instances | `instances` → named clones | same-name rows → `name` / `name-1` / … |
+
+PM2 ecosystem aliases: `args`, `cwd`, `env`, `env_*`, `max_restarts`, `autorestart`, log paths, `interpreter`, `node_args`, `restart_delay`, `instances`, `watch`, `cron_restart`. Not supported: `exec_mode` cluster semantics, ecosystem `.js` evaluation, live `jlist`, per-user daemon.
+
+**Instances footgun:** re-importing a smaller `instances` count does **not** delete leftover `name-N` clones — remove them with `nexarun delete` if needed.
+
+System Admin / LocalSystem (not per-user): see [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md).
 
 ---
 
-## `nexarun stop` / `restart` / `delete`
+## `nexarun stop` / `restart` / `reload` / `delete`
 
-Stop attempts a soft signal, waits up to **8 seconds**, then force-kills the process tree. Windows has no POSIX SIGTERM; windowless redirected children usually need the force-kill path.
+Stop attempts a soft signal, waits up to **8 seconds**, then force-kills the process tree and terminates the per-app Job Object. Job Objects do **not** use kill-on-close, so a daemon recycle can still reattach surviving PIDs. Windows has no POSIX SIGTERM; windowless redirected children usually need the force-kill path.
+
+Stop also cancels pending crash-restart backoff and any in-flight ready-port/file wait.
 
 ```powershell
 nexarun stop myapi
 nexarun stop all
 nexarun restart 0
 nexarun restart all
+nexarun reload myapi
+nexarun reload all
 nexarun delete myapi
 nexarun delete all
 nexarun delete-all
 ```
+
+`reload` is a graceful recycle (soft stop + start). It is **not** PM2 cluster zero-downtime reload — expect brief downtime on a single Windows process.
 
 `delete all` / `delete-all` stops and removes every managed process (same effect as `clear-all`).
 
@@ -127,13 +162,39 @@ User stop sets **DesiredStatus=Stopped** and cancels any pending crash-restart b
 
 ---
 
-## `nexarun list` / `describe` / `history`
+## `nexarun reset` / `flush`
+
+```powershell
+nexarun reset myapi      # zero restart counter (process keeps running)
+nexarun reset all
+nexarun flush myapi      # truncate logs + delete .1…\.N backups
+nexarun flush all
+```
+
+---
+
+## `nexarun list` / `describe` / `env` / `history`
 
 ```powershell
 nexarun list
+nexarun list --json
 nexarun describe myapi
+nexarun env myapi
+nexarun env myapi --json
 nexarun history myapi
 ```
+
+`list --json` includes `environment`, ready fields, and `restartDelayMs` (same subset as describe for day-to-day ops). `env` prints saved `KEY=VALUE` lines and **may expose secrets** — avoid piping to shared logs.
+
+---
+
+## `nexarun monit`
+
+```powershell
+nexarun monit
+```
+
+Live-refreshes the process table every **2 seconds** (Spectre table). Press **Ctrl+C** to exit with code **0**. For CPU/memory history charts, use the tray **Dashboard** instead.
 
 ---
 
@@ -143,9 +204,11 @@ nexarun history myapi
 nexarun logs <id|name> [--lines 50] [--out|--err] [--follow]
 ```
 
-`--follow` appends new bytes from the log file (handles rotation). Ctrl+C exits with code 0.
+`--follow` appends new bytes from the **current** log file (handles truncate/rotate of that file; does not stream `.1` archives). Ctrl+C exits with code 0.
 
 Default log path: `%ProgramData%\NexaRun\logs\<name>.log`
+
+After a daemon recycle, NexaRun may **reattach** a live PID. Existing log files remain readable, but live stdout/stderr capture resumes only after a **restart** (Windows cannot reattach anonymous pipes).
 
 ---
 
@@ -172,11 +235,28 @@ nexarun daemon status
 
 ## Auto-restart behavior
 
-- Crash backoff: 1s → 2s → 4s → 8s → 16s (cap **30s**). No extra 30s settle stacked on crash restarts.
+- Crash backoff: 1s → 2s → 4s → 8s → 16s → **30s** (capped). Status is **Starting** (not Online) during backoff. The 30s step only appears when `--max-restarts` is high enough (default **3** reaches 1s/2s/4s only). Optional `--restart-delay` / JSON `restartDelayMs` raises the floor (`max(backoff, delay)`). No extra settle stacked on crash restarts.
+- Ready-port/file gates apply to crash relaunches the same as initial start.
 - User restart settle defaults: **2s** after stop and **2s** after start (batch spacing).
-- Default **3** crash retries; then **Errored**.
+- Default **3** crash retries; then **Errored**. `--max-restarts` is attempt count — not the same as the 30s backoff cap.
 - `--no-autorestart`: exit → **Errored** (auto-restart off), history records Crashed.
-- Counter resets after **30 seconds** of stable uptime.
+- Counter resets after **30 seconds** of stable uptime, or via `nexarun reset`.
+
+---
+
+## System Admin / LocalSystem
+
+NexaRun is a **machine-wide** service for **System Administrators** — not a per-user daemon. The Windows service runs as **LocalSystem** by default (Session 0). Children inherit the **service** environment — not an interactive profile, mapped drives (`Z:`), or HKCU. Prefer:
+
+- Absolute paths for interpreters and working directories (or UNC shares)
+- Per-process `--env` / JSON `environment` (include `PATH` so interpreter resolve finds `node`/`python` under the service)
+- Tray **Add/Edit Process → Environment & readiness** for the same fields without CLI
+
+Optional dedicated **service** account (admin-owned only): [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md).
+
+Tray **Add/Edit Process → Environment & readiness** also covers watch, watch path, cron restart, and restart delay (same fields as CLI/JSON).
+
+Data lives under `%ProgramData%\NexaRun` (shared by daemon, CLI, and tray). Restrict ACLs on shared machines if you store secrets in `processes.json` / `settings.json`.
 
 ---
 

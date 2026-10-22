@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using NexaRun.Daemon;
 using NexaRun.Shared;
+using NexaRun.Shared.Config;
 using NexaRun.Shared.Models;
 
 namespace NexaRun.Tests;
@@ -181,5 +182,162 @@ public class ProcessManagerLifecycleTests : IDisposable
         Assert.Equal(ProcessStatus.Stopped, p.Status);
         Assert.Equal(ProcessStatus.Stopped, p.DesiredStatus);
         Assert.Null(p.Pid);
+    }
+
+    [Fact]
+    public async Task Ready_timeout_marks_errored()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var (ok, message, proc) = await mgr.Start(new StartOptions
+        {
+            Name = "ready-timeout",
+            ExecutablePath = "powershell.exe",
+            Arguments = "-NoProfile -Command Start-Sleep -Seconds 60",
+            AutoRestart = false,
+            ReadyPort = 1, // almost never listening
+            ReadyTimeoutMs = 500
+        });
+
+        Assert.False(ok);
+        Assert.NotNull(proc);
+        Assert.Equal(ProcessStatus.Errored, proc!.Status);
+        Assert.Contains("ready", message, StringComparison.OrdinalIgnoreCase);
+
+        await mgr.Delete("ready-timeout");
+    }
+
+    [Fact]
+    public async Task Stop_during_ready_cancels_to_stopped()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var startTask = mgr.Start(new StartOptions
+        {
+            Name = "ready-cancel",
+            ExecutablePath = "powershell.exe",
+            Arguments = "-NoProfile -Command Start-Sleep -Seconds 60",
+            AutoRestart = false,
+            ReadyPort = 1,
+            ReadyTimeoutMs = 15_000
+        });
+
+        await Task.Delay(300);
+        var (stopOk, _) = await mgr.Stop("ready-cancel");
+        Assert.True(stopOk);
+
+        var (ok, _, proc) = await startTask;
+        Assert.False(ok);
+        Assert.NotNull(proc);
+        Assert.Equal(ProcessStatus.Stopped, proc!.Status);
+        Assert.Equal(ProcessStatus.Stopped, proc.DesiredStatus);
+    }
+
+    [Fact]
+    public async Task Invalid_cron_rejected_on_start()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var (ok, message, _) = await mgr.Start(new StartOptions
+        {
+            Name = "bad-cron",
+            ExecutablePath = "powershell.exe",
+            Arguments = "-NoProfile -Command Start-Sleep -Seconds 5",
+            CronRestart = "not a cron"
+        });
+
+        Assert.False(ok);
+        Assert.Contains("cron", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await mgr.GetAll());
+    }
+
+    [Fact]
+    public async Task Cron_fires_once_per_minute_key()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var (ok, _, _) = await mgr.Start(new StartOptions
+        {
+            Name = "cron-app",
+            ExecutablePath = "powershell.exe",
+            Arguments = "-NoProfile -Command Start-Sleep -Seconds 120",
+            AutoRestart = false,
+            CronRestart = "* * * * *"
+        });
+        Assert.True(ok);
+
+        await mgr.CheckWatchAndCron();
+        var afterFirst = await mgr.GetAll();
+        var firstStarted = Assert.Single(afterFirst).StartedAt;
+
+        await mgr.CheckWatchAndCron();
+        var afterSecond = await mgr.GetAll();
+        Assert.Equal(firstStarted, Assert.Single(afterSecond).StartedAt);
+
+        await mgr.Stop("cron-app");
+        await mgr.Delete("cron-app");
+    }
+
+    [Fact]
+    public async Task Import_named_clones_then_delete()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var clones = InstanceCloneExpander.Expand(
+        [
+            new StartOptions
+            {
+                Name = "api",
+                ExecutablePath = "powershell.exe",
+                Arguments = "-NoProfile -Command Start-Sleep -Seconds 1",
+                Instances = 3,
+                AutoRestart = false
+            }
+        ]);
+
+        Assert.Equal(3, clones.Count);
+        var (importOk, _) = await mgr.ImportBatch(clones, start: false);
+        Assert.True(importOk);
+
+        var all = await mgr.GetAll();
+        Assert.Equal(3, all.Count);
+        Assert.Contains(all, p => p.Name == "api");
+        Assert.Contains(all, p => p.Name == "api-1");
+        Assert.Contains(all, p => p.Name == "api-2");
+
+        await mgr.Delete("api-1");
+        all = await mgr.GetAll();
+        Assert.Equal(2, all.Count);
+        Assert.DoesNotContain(all, p => p.Name == "api-1");
+    }
+
+    [Fact]
+    public async Task Flush_while_running_succeeds()
+    {
+        var mgr = CreateManager();
+        await mgr.Load();
+
+        var (ok, _, proc) = await mgr.Start(new StartOptions
+        {
+            Name = "flush-me",
+            ExecutablePath = "powershell.exe",
+            Arguments = "-NoProfile -Command Start-Sleep -Seconds 60",
+            AutoRestart = false
+        });
+        Assert.True(ok);
+        Assert.NotNull(proc);
+
+        var (flushOk, flushMsg) = await mgr.ClearLogs("flush-me");
+        Assert.True(flushOk);
+        Assert.Contains("Cleared", flushMsg);
+        Assert.Equal(ProcessStatus.Online, (await mgr.GetAll()).Single().Status);
+
+        await mgr.Stop("flush-me");
+        await mgr.Delete("flush-me");
     }
 }

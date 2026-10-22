@@ -70,6 +70,48 @@ public static class StartCommand
             Description = "Prefix log lines with timestamps"
         };
 
+        var envOpt = new Option<string[]>("--env")
+        {
+            Description = "Environment KEY=VALUE (repeatable)",
+            AllowMultipleArgumentsPerToken = true
+        };
+        envOpt.Arity = ArgumentArity.ZeroOrMore;
+
+        var readyPortOpt = new Option<int?>("--ready-port")
+        {
+            Description = "Wait until TCP 127.0.0.1:port accepts before marking Online"
+        };
+
+        var readyFileOpt = new Option<string?>("--ready-file")
+        {
+            Description = "Wait until this file exists before marking Online"
+        };
+
+        var readyTimeoutOpt = new Option<int?>("--ready-timeout")
+        {
+            Description = $"Ready-check timeout in ms (default: {ProcessDefaults.ReadyTimeoutMs})"
+        };
+
+        var restartDelayOpt = new Option<int?>("--restart-delay")
+        {
+            Description = "Minimum crash-restart delay in ms (actual delay is max of exponential backoff and this value)"
+        };
+
+        var watchOpt = new Option<bool>("--watch")
+        {
+            Description = "Restart when files change under the working directory (or --watch-path)"
+        };
+
+        var watchPathOpt = new Option<string?>("--watch-path")
+        {
+            Description = "Directory to watch when --watch is set"
+        };
+
+        var cronOpt = new Option<string?>("--cron-restart")
+        {
+            Description = "5-field cron (local time) for scheduled restart, e.g. \"0 3 * * *\""
+        };
+
         var forwardArgs = new Argument<string[]>("appArgs")
         {
             Arity = ArgumentArity.ZeroOrMore,
@@ -79,7 +121,9 @@ public static class StartCommand
         var cmd = new Command("start", "Start a process by id/name/all (PM2-style) or register a new script/executable")
         {
             targetArg, nameOpt, argsOpt, cwdOpt, noRestartOpt,
-            maxRestartsOpt, maxCpuOpt, maxMemOpt, outLogOpt, errLogOpt, logOpt, timeOpt, forwardArgs
+            maxRestartsOpt, maxCpuOpt, maxMemOpt, outLogOpt, errLogOpt, logOpt, timeOpt,
+            envOpt, readyPortOpt, readyFileOpt, readyTimeoutOpt, restartDelayOpt,
+            watchOpt, watchPathOpt, cronOpt, forwardArgs
         };
 
         cmd.SetAction(async parseResult =>
@@ -89,8 +133,11 @@ public static class StartCommand
                 return await StartAllRunner.Run(client);
 
             var forwarded = parseResult.GetValue(forwardArgs) ?? [];
+            var envPairs = parseResult.GetValue(envOpt) ?? [];
             var hasOptions = WantsNewExecutable(parseResult, argsOpt, cwdOpt, nameOpt, outLogOpt, errLogOpt, logOpt,
-                noRestartOpt, maxRestartsOpt, maxCpuOpt, maxMemOpt, timeOpt) || forwarded.Length > 0;
+                noRestartOpt, maxRestartsOpt, maxCpuOpt, maxMemOpt, timeOpt, envPairs,
+                readyPortOpt, readyFileOpt, readyTimeoutOpt, restartDelayOpt,
+                watchOpt, watchPathOpt, cronOpt) || forwarded.Length > 0;
 
             // Ask daemon for current names when deciding existing vs new (best-effort).
             var list = await client.Send(new IpcRequest { Command = "list" }, showProgress: false);
@@ -122,7 +169,15 @@ public static class StartCommand
                     parseResult.GetValue(outLogOpt),
                     parseResult.GetValue(errLogOpt),
                     parseResult.GetValue(logOpt),
-                    parseResult.GetValue(timeOpt));
+                    parseResult.GetValue(timeOpt),
+                    EnvironmentPairParser.Parse(envPairs),
+                    parseResult.GetValue(readyPortOpt),
+                    parseResult.GetValue(readyFileOpt),
+                    parseResult.GetValue(readyTimeoutOpt),
+                    parseResult.GetValue(restartDelayOpt),
+                    parseResult.GetValue(watchOpt),
+                    parseResult.GetValue(watchPathOpt),
+                    parseResult.GetValue(cronOpt));
             }
 
             if (StartTargetResolver.LooksLikeExecutableOrScript(target) &&
@@ -140,7 +195,15 @@ public static class StartCommand
                     parseResult.GetValue(outLogOpt),
                     parseResult.GetValue(errLogOpt),
                     parseResult.GetValue(logOpt),
-                    parseResult.GetValue(timeOpt));
+                    parseResult.GetValue(timeOpt),
+                    EnvironmentPairParser.Parse(envPairs),
+                    parseResult.GetValue(readyPortOpt),
+                    parseResult.GetValue(readyFileOpt),
+                    parseResult.GetValue(readyTimeoutOpt),
+                    parseResult.GetValue(restartDelayOpt),
+                    parseResult.GetValue(watchOpt),
+                    parseResult.GetValue(watchPathOpt),
+                    parseResult.GetValue(cronOpt));
             }
 
             var response = await client.Send(CliCommands.TargetRequest("start", target));
@@ -150,8 +213,22 @@ public static class StartCommand
         return cmd;
     }
 
-    private static string QuoteIfNeeded(string value) =>
-        value.Contains(' ') ? $"\"{value}\"" : value;
+    private static string QuoteIfNeeded(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+        var needsQuotes = false;
+        foreach (var ch in value)
+        {
+            if (ch is ' ' or '\t' or '"')
+            {
+                needsQuotes = true;
+                break;
+            }
+        }
+
+        if (!needsQuotes) return value;
+        return "\"" + value.Replace("\"", "\"\"") + "\"";
+    }
 
     private static bool WantsNewExecutable(
         ParseResult parseResult,
@@ -165,7 +242,15 @@ public static class StartCommand
         Option<int?> maxRestartsOpt,
         Option<double?> maxCpuOpt,
         Option<long?> maxMemOpt,
-        Option<bool> timeOpt)
+        Option<bool> timeOpt,
+        string[] envPairs,
+        Option<int?> readyPortOpt,
+        Option<string?> readyFileOpt,
+        Option<int?> readyTimeoutOpt,
+        Option<int?> restartDelayOpt,
+        Option<bool> watchOpt,
+        Option<string?> watchPathOpt,
+        Option<string?> cronOpt)
     {
         if (!string.IsNullOrWhiteSpace(parseResult.GetValue(argsOpt))) return true;
         if (!string.IsNullOrWhiteSpace(parseResult.GetValue(cwdOpt))) return true;
@@ -178,6 +263,14 @@ public static class StartCommand
         if (parseResult.GetValue(maxCpuOpt).HasValue) return true;
         if (parseResult.GetValue(maxMemOpt).HasValue) return true;
         if (parseResult.GetValue(timeOpt)) return true;
+        if (envPairs.Length > 0) return true;
+        if (parseResult.GetValue(readyPortOpt).HasValue) return true;
+        if (!string.IsNullOrWhiteSpace(parseResult.GetValue(readyFileOpt))) return true;
+        if (parseResult.GetValue(readyTimeoutOpt).HasValue) return true;
+        if (parseResult.GetValue(restartDelayOpt).HasValue) return true;
+        if (parseResult.GetValue(watchOpt)) return true;
+        if (!string.IsNullOrWhiteSpace(parseResult.GetValue(watchPathOpt))) return true;
+        if (!string.IsNullOrWhiteSpace(parseResult.GetValue(cronOpt))) return true;
         return false;
     }
 
@@ -194,7 +287,15 @@ public static class StartCommand
         string? outLog,
         string? errLog,
         string? combinedLog,
-        bool logTimestamps)
+        bool logTimestamps,
+        Dictionary<string, string>? environment,
+        int? readyPort,
+        string? readyFile,
+        int? readyTimeoutMs,
+        int? restartDelayMs,
+        bool watch,
+        string? watchPath,
+        string? cronRestart)
     {
         var response = await client.Send(new IpcRequest
         {
@@ -212,7 +313,15 @@ public static class StartCommand
                 OutLogFile = outLog,
                 ErrorLogFile = errLog,
                 CombinedLogFile = combinedLog,
-                LogTimestamps = logTimestamps
+                LogTimestamps = logTimestamps,
+                Environment = environment,
+                ReadyPort = readyPort,
+                ReadyFile = readyFile,
+                ReadyTimeoutMs = readyTimeoutMs,
+                RestartDelayMs = restartDelayMs,
+                Watch = watch,
+                WatchPath = watchPath,
+                CronRestart = cronRestart
             }
         });
 

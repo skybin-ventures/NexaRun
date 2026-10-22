@@ -31,9 +31,14 @@ public static class ImportCommand
             Description = "Start processes after importing them"
         };
 
+        var envNameOpt = new Option<string?>("--env-name")
+        {
+            Description = "JSON only: merge env_<name> (e.g. production → env_production) over base env"
+        };
+
         var cmd = new Command("import", "Import processes from a JSON file or PM2 dump.pm2")
         {
-            fileArg, fromPm2Opt, onlyOpt, startOpt
+            fileArg, fromPm2Opt, onlyOpt, startOpt, envNameOpt
         };
 
         cmd.SetAction(async parseResult =>
@@ -42,6 +47,7 @@ public static class ImportCommand
             var file = parseResult.GetValue(fileArg);
             var only = parseResult.GetValue(onlyOpt);
             var start = parseResult.GetValue(startOpt);
+            var envName = parseResult.GetValue(envNameOpt);
 
             var hasFile = !string.IsNullOrWhiteSpace(file);
             if (!hasFile)
@@ -68,6 +74,12 @@ public static class ImportCommand
 
                 if (isDumpFile)
                 {
+                    if (!string.IsNullOrWhiteSpace(envName))
+                    {
+                        AnsiConsole.MarkupLine(
+                            "[yellow]--env-name applies to JSON ecosystem imports (env_production). dump.pm2 already has merged env; ignoring.[/]");
+                    }
+
                     var result = Pm2LiveImport.ReadDumpFile(file!, only);
                     options = result.Options;
                     clientSummary = result.Summary;
@@ -81,7 +93,7 @@ public static class ImportCommand
                         return 1;
                     }
 
-                    options = ProcessConfigTransfer.FromImportFile(path, only);
+                    options = ProcessConfigTransfer.FromImportFile(path, only, envName);
                 }
 
                 var response = await client.Send(new IpcRequest

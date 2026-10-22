@@ -20,6 +20,7 @@ public class DaemonWorker(ProcessManager processManager, ILogger<DaemonWorker> l
                 await processManager.CheckAndRestartCrashed();
                 await processManager.CheckResourceLimits();
                 await processManager.CheckAndRecoverFailed();
+                await processManager.CheckWatchAndCron();
             }
             catch (Exception ex)
             {

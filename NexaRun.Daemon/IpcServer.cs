@@ -105,6 +105,9 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
                 "stop" => await HandleStop(request.ProcessName),
                 "restart" => await HandleRestart(request.ProcessName, request.SettleAfterStart),
                 "restart-all" => await HandleRestartAll(),
+                "reload" when IsAllTarget(request.ProcessName) => await HandleReloadAll(),
+                "reload" => await HandleReload(request.ProcessName, request.SettleAfterStart),
+                "reset" => await HandleReset(request.ProcessName),
                 "delete" when IsAllTarget(request.ProcessName) => await HandleDeleteAll(),
                 "delete-all" => await HandleDeleteAll(),
                 "delete" => await HandleDelete(request.ProcessName),
@@ -113,6 +116,7 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
                 "describe" => await HandleDescribe(request.ProcessName),
                 "logs" => await HandleLogs(request.ProcessName, request.LogLines ?? 50, request.LogStream),
                 "clear-logs" => await HandleClearLogs(request.ProcessName),
+                "flush" => await HandleClearLogs(request.ProcessName ?? "all"),
                 "history" => await HandleHistory(request.ProcessName),
                 "save" => await HandleSave(),
                 "resurrect" => await HandleResurrect(),
@@ -233,6 +237,43 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
         var (success, message) = await processManager.RestartAllProcesses();
         var processes = await processManager.GetAll();
         return new IpcResponse { Success = success, Message = message, Processes = processes };
+    }
+
+    private async Task<IpcResponse> HandleReload(string? target, bool settleAfterStart)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return new IpcResponse { Success = false, Message = "Process id or name required." };
+        var (success, message, process) = await processManager.Reload(target, settleAfterStart);
+        if (success && process != null)
+            message = $"Process '{process.Name}' reloaded.";
+        return new IpcResponse
+        {
+            Success = success,
+            Message = message,
+            Processes = process != null ? [process] : null
+        };
+    }
+
+    private async Task<IpcResponse> HandleReloadAll()
+    {
+        var (success, message) = await processManager.RestartAllProcesses();
+        if (success)
+            message = message.Replace("Restart All", "Reload All", StringComparison.Ordinal);
+        var processes = await processManager.GetAll();
+        return new IpcResponse { Success = success, Message = message, Processes = processes };
+    }
+
+    private async Task<IpcResponse> HandleReset(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return new IpcResponse { Success = false, Message = "Process id or name (or all) required." };
+        var (success, message, process) = await processManager.Reset(target);
+        return new IpcResponse
+        {
+            Success = success,
+            Message = message,
+            Processes = process != null ? [process] : null
+        };
     }
 
     private async Task<IpcResponse> HandleDelete(string? target)

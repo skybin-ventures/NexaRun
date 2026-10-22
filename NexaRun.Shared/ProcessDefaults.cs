@@ -24,4 +24,29 @@ public static class ProcessDefaults
 
     /// <summary>Rotate log files when they exceed this size (bytes).</summary>
     public const long MaxLogFileBytes = 10 * 1024 * 1024;
+
+    /// <summary>Maximum crash-restart backoff delay (ms).</summary>
+    public const int MaxCrashRestartBackoffMs = 30_000;
+
+    /// <summary>
+    /// Exponential crash-restart backoff: 1s, 2s, 4s, 8s, 16s, then capped at <see cref="MaxCrashRestartBackoffMs"/>.
+    /// </summary>
+    /// <param name="restarts">1-based restart attempt count after increment.</param>
+    public static int CrashRestartBackoffMs(int restarts)
+    {
+        if (restarts < 1)
+            restarts = 1;
+        // Exponent up to 5 → 2^5 * 1000 = 32000, then Min with 30s.
+        var exponent = Math.Min(restarts - 1, 5);
+        return Math.Min((int)Math.Pow(2, exponent) * 1000, MaxCrashRestartBackoffMs);
+    }
+
+    /// <summary>Number of rotated log generations to keep (.1 … .N).</summary>
+    public const int MaxLogGenerations = 3;
+
+    /// <summary>Default wait for optional ready-port / ready-file before marking Online.</summary>
+    public const int ReadyTimeoutMs = 30_000;
+
+    /// <summary>Debounce window for file-watch restarts (ms).</summary>
+    public const int WatchDebounceMs = 1_500;
 }

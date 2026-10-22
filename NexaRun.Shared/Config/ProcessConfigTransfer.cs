@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NexaRun.Shared;
 using NexaRun.Shared.Models;
 
 namespace NexaRun.Shared.Config;
@@ -36,7 +37,14 @@ public static class ProcessConfigTransfer
             LogFile = p.LogFile,
             LogTimestamps = p.LogTimestamps,
             Environment = p.Environment,
-            Url = p.Url
+            Url = p.Url,
+            ReadyPort = p.ReadyPort,
+            ReadyFile = p.ReadyFile,
+            ReadyTimeoutMs = p.ReadyTimeoutMs,
+            RestartDelayMs = p.RestartDelayMs,
+            Watch = p.Watch,
+            WatchPath = p.WatchPath,
+            CronRestart = p.CronRestart
         };
 
     public static StartOptions ToStartOptions(ProcessDefinition def)
@@ -56,13 +64,21 @@ public static class ProcessConfigTransfer
             CombinedLogFile = def.LogFile,
             LogTimestamps = def.LogTimestamps,
             Environment = def.Environment,
-            Url = def.Url
+            Url = def.Url,
+            ReadyPort = def.ReadyPort,
+            ReadyFile = def.ReadyFile,
+            ReadyTimeoutMs = def.ReadyTimeoutMs,
+            RestartDelayMs = def.RestartDelayMs,
+            Watch = def.Watch,
+            WatchPath = def.WatchPath,
+            CronRestart = def.CronRestart,
+            Instances = def.Instances
         };
         ProcessUrlHelper.ApplyUrl(options);
         return options;
     }
 
-    public static List<StartOptions> FromImportFile(string path, string? onlyApp = null)
+    public static List<StartOptions> FromImportFile(string path, string? onlyApp = null, string? envName = null)
     {
         if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Only .json process files are supported.");
@@ -85,9 +101,20 @@ public static class ProcessConfigTransfer
         }
 
         foreach (var app in apps)
+        {
             app.ApplyPm2Aliases();
+            if (!string.IsNullOrWhiteSpace(envName))
+                app.SelectNamedEnvironment(envName);
 
-        return apps.Select(ToStartOptions).ToList();
+            if (!string.IsNullOrWhiteSpace(app.CronRestart) &&
+                !CronExpression.TryValidate(app.CronRestart, out var cronError))
+            {
+                throw new InvalidOperationException(
+                    $"App '{app.Name}' has invalid cron_restart: {cronError}");
+            }
+        }
+
+        return InstanceCloneExpander.Expand(apps.Select(ToStartOptions));
     }
 
     public static async Task WriteBundleAsync(ProcessExportBundle bundle, string path)

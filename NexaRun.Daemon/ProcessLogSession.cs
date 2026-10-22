@@ -99,7 +99,7 @@ public sealed class ProcessLogSession : IDisposable
 
     private static StreamWriter OpenWriter(string path)
     {
-        RotateIfNeeded(path);
+        LogFileHelper.RotateGenerations(path);
 
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -107,25 +107,6 @@ public sealed class ProcessLogSession : IDisposable
 
         var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
         return new StreamWriter(stream, Utf8NoBom) { AutoFlush = true };
-    }
-
-    private static void RotateIfNeeded(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) return;
-
-            var info = new FileInfo(path);
-            if (info.Length < ProcessDefaults.MaxLogFileBytes) return;
-
-            var rotated = path + ".1";
-            if (File.Exists(rotated)) File.Delete(rotated);
-            File.Move(path, rotated, overwrite: true);
-        }
-        catch
-        {
-            /* rotation is best-effort */
-        }
     }
 
     private static string? NormalizePath(string? path) =>

@@ -1,8 +1,9 @@
 using System.Text;
+using NexaRun.Shared;
 
 namespace NexaRun.Daemon;
 
-internal static class LogFileHelper
+public static class LogFileHelper
 {
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     public static void AppendLine(string path, string line, bool timestamps = true)
@@ -55,11 +56,48 @@ internal static class LogFileHelper
             FileShare.ReadWrite);
     }
 
-    public static void DeleteRotated(string path)
+    public static void DeleteRotated(string path, int generations = ProcessDefaults.MaxLogGenerations)
     {
-        var rotated = path + ".1";
-        if (File.Exists(rotated))
-            File.Delete(rotated);
+        var max = Math.Max(1, generations);
+        for (var i = 1; i <= max; i++)
+        {
+            var rotated = $"{path}.{i}";
+            if (File.Exists(rotated))
+                File.Delete(rotated);
+        }
+    }
+
+    /// <summary>
+    /// Rotate current → .1, .1 → .2, … dropping the oldest beyond <paramref name="generations"/>.
+    /// </summary>
+    public static void RotateGenerations(string path, int generations = ProcessDefaults.MaxLogGenerations)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+
+            var info = new FileInfo(path);
+            if (info.Length < ProcessDefaults.MaxLogFileBytes) return;
+
+            var max = Math.Max(1, generations);
+            var oldest = $"{path}.{max}";
+            if (File.Exists(oldest))
+                File.Delete(oldest);
+
+            for (var i = max - 1; i >= 1; i--)
+            {
+                var src = $"{path}.{i}";
+                var dst = $"{path}.{i + 1}";
+                if (File.Exists(src))
+                    File.Move(src, dst, overwrite: true);
+            }
+
+            File.Move(path, $"{path}.1", overwrite: true);
+        }
+        catch
+        {
+            /* rotation is best-effort */
+        }
     }
 
     public static IEnumerable<string> UniquePaths(params string?[] paths)

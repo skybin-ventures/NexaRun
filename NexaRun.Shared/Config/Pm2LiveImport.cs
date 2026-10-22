@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NexaRun.Shared;
 using NexaRun.Shared.Models;
 
 namespace NexaRun.Shared.Config;
@@ -75,29 +76,33 @@ public static class Pm2LiveImport
         }
 
         var options = new List<StartOptions>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var clusterSkipped = 0;
+        var nameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var clusterClones = 0;
 
         foreach (var entry in dump)
         {
-            var name = entry.ResolveName();
-            if (string.IsNullOrWhiteSpace(name) || IsInternalPm2(name, entry))
+            var baseName = entry.ResolveName();
+            if (string.IsNullOrWhiteSpace(baseName) || IsInternalPm2(baseName, entry))
                 continue;
 
-            if (!seen.Add(name))
-            {
-                clusterSkipped++;
-                continue;
-            }
+            nameCounts.TryGetValue(baseName, out var count);
+            nameCounts[baseName] = count + 1;
+            var name = count == 0 ? baseName : $"{baseName}-{count}";
+            if (count > 0)
+                clusterClones++;
 
-            options.Add(MapToStartOptions(name, entry));
+            var opt = MapToStartOptions(name, entry);
+            opt.Environment ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!opt.Environment.ContainsKey("NODE_APP_INSTANCE"))
+                opt.Environment["NODE_APP_INSTANCE"] = count.ToString();
+            options.Add(opt);
         }
 
         if (options.Count == 0)
             throw new InvalidOperationException("No apps found in PM2 dump to import.");
 
-        var clusterNote = clusterSkipped > 0
-            ? $"; skipped {clusterSkipped} cluster duplicate(s)"
+        var clusterNote = clusterClones > 0
+            ? $"; expanded {clusterClones} cluster instance(s) to named clones (name-1, …)"
             : string.Empty;
 
         return new Pm2LiveImportResult
@@ -105,7 +110,7 @@ public static class Pm2LiveImport
             Options = options,
             Summary = $"Mapped {options.Count} app(s) from dump.pm2{clusterNote}.",
             EnrichedFromDump = options.Count,
-            ClusterDuplicatesSkipped = clusterSkipped
+            ClusterDuplicatesSkipped = 0
         };
     }
 
@@ -190,8 +195,19 @@ public static class Pm2LiveImport
             OutLogFile = NullIfBlank(env.PmOutLogPath),
             ErrorLogFile = NullIfBlank(env.PmErrLogPath),
             CombinedLogFile = NullIfBlank(env.PmLogPath),
-            Environment = FilterEnv(env.Env)
+            Environment = FilterEnv(env.Env),
+            Watch = env.Watch == true,
+            WatchPath = NullIfBlank(env.WatchPath),
+            CronRestart = NullIfBlank(env.CronRestart),
+            RestartDelayMs = env.RestartDelay is > 0 ? env.RestartDelay : null
         };
+
+        if (!string.IsNullOrWhiteSpace(options.CronRestart) &&
+            !CronExpression.TryValidate(options.CronRestart, out var cronError))
+        {
+            throw new InvalidOperationException(
+                $"App '{name}' has invalid cron_restart: {cronError}");
+        }
 
         ProcessUrlHelper.ApplyUrl(options);
         return options;
@@ -354,6 +370,18 @@ public static class Pm2LiveImport
 
         [JsonPropertyName("env")]
         public Dictionary<string, JsonElement>? Env { get; set; }
+
+        [JsonPropertyName("watch")]
+        public bool? Watch { get; set; }
+
+        [JsonPropertyName("watch_path")]
+        public string? WatchPath { get; set; }
+
+        [JsonPropertyName("cron_restart")]
+        public string? CronRestart { get; set; }
+
+        [JsonPropertyName("restart_delay")]
+        public int? RestartDelay { get; set; }
 
         [JsonPropertyName("pmx_module")]
         public bool? Module { get; set; }

@@ -33,4 +33,17 @@ public class NexaProcess
     public long? MaxMemoryMb { get; set; }
     /// <summary>Optional URL opened from the Processes window (e.g. http://localhost:3101).</summary>
     public string? Url { get; set; }
+    public int? ReadyPort { get; set; }
+    public string? ReadyFile { get; set; }
+    public int? ReadyTimeoutMs { get; set; }
+    /// <summary>
+    /// Optional minimum crash-restart delay (ms). Actual delay is max(exponential backoff, this value).
+    /// </summary>
+    public int? RestartDelayMs { get; set; }
+    /// <summary>Restart when files under <see cref="WatchPath"/> (or working directory) change.</summary>
+    public bool Watch { get; set; }
+    /// <summary>Directory to watch when <see cref="Watch"/> is true (default: working directory).</summary>
+    public string? WatchPath { get; set; }
+    /// <summary>Standard 5-field cron (local time) for scheduled restart, e.g. <c>0 3 * * *</c>.</summary>
+    public string? CronRestart { get; set; }
 }

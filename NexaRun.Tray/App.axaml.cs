@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -67,6 +68,7 @@ public class App : Application
 
         menu.Items.Add(new NativeMenuItemSeparator());
         AddMenuItem(menu, "Open data folder", (_, _) => OpenDataFolder());
+        AddMenuItem(menu, "About NexaRun", (_, _) => RunTrayAction(ShowAbout));
         AddMenuItem(menu, "Exit NexaRun", (_, _) => desktop.Shutdown());
 
         _trayIcon = new TrayIcon
@@ -144,6 +146,47 @@ public class App : Application
             FileName = NexaRunPaths.DataDir,
             UseShellExecute = true
         });
+    }
+
+    private async Task ShowAbout()
+    {
+        NexaRunPaths.EnsureDirectories();
+        var version = GetTrayVersion();
+        var cliPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "NexaRun", "bin", "nexarun.exe");
+        var cliLine = File.Exists(cliPath)
+            ? cliPath
+            : "nexarun (on PATH after install)";
+
+        var body =
+            "NexaRun — process manager for Windows\n" +
+            "Machine-wide service for System Administrators.\n\n" +
+            $"Version: {version}\n\n" +
+            "Developed by Skybin AI Ventures LLP\n\n" +
+            "Resources\n" +
+            "  Website:     https://skybin.io\n" +
+            $"  Data folder: {NexaRunPaths.DataDir}\n" +
+            $"  Log folder:  {NexaRunPaths.LogDir}\n" +
+            $"  CLI:         {cliLine}\n" +
+            "  Service:     NexaRunDaemon (Windows Service)";
+        await MessageDialog.Show(VisibleOwner(), "About NexaRun", body);
+    }
+
+    private static string GetTrayVersion()
+    {
+        var assembly = typeof(App).Assembly;
+        var informational = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            var plus = informational.IndexOf('+', StringComparison.Ordinal);
+            return plus >= 0 ? informational[..plus] : informational;
+        }
+
+        return assembly.GetName().Version?.ToString(3) ?? "unknown";
     }
 
     private Task RefreshMainWindow() =>

@@ -18,4 +18,20 @@ public class StartOptions
     public bool LogTimestamps { get; set; }
     public Dictionary<string, string>? Environment { get; set; }
     public string? Url { get; set; }
+    /// <summary>Optional: wait until TCP 127.0.0.1:port accepts before Online.</summary>
+    public int? ReadyPort { get; set; }
+    /// <summary>Optional: wait until this file exists before Online.</summary>
+    public string? ReadyFile { get; set; }
+    /// <summary>Ready-check timeout in ms (default <see cref="ProcessDefaults.ReadyTimeoutMs"/>).</summary>
+    public int? ReadyTimeoutMs { get; set; }
+    /// <summary>
+    /// Optional minimum crash-restart delay (ms). Actual delay is max(exponential backoff, this value).
+    /// </summary>
+    public int? RestartDelayMs { get; set; }
+    public bool Watch { get; set; }
+    public string? WatchPath { get; set; }
+    /// <summary>Standard 5-field cron (local time) for scheduled restart.</summary>
+    public string? CronRestart { get; set; }
+    /// <summary>Import-only: expand into named clones (<c>name</c>, <c>name-1</c>, …). Not persisted.</summary>
+    public int? Instances { get; set; }
 }

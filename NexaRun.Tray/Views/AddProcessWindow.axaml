@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NexaRun.Tray.Views.AddProcessWindow"
         Title="Add Process"
-        Width="520" Height="520"
-        MinWidth="420" MinHeight="360"
+        Width="520" Height="640"
+        MinWidth="420" MinHeight="420"
         CanResize="True"
         WindowStartupLocation="CenterOwner">
 
@@ -52,6 +52,51 @@
                  AutomationProperties.Name="URL" />
 
         <CheckBox x:Name="AutoRestartBox" Content="Auto-restart on crash" IsChecked="True" Margin="0 4 0 0" />
+
+        <Expander Header="Environment &amp; readiness" IsExpanded="False" Margin="0 4 0 0">
+          <StackPanel Spacing="10" Margin="0 8 0 0">
+            <TextBlock Text="Environment (one KEY=VALUE per line)" />
+            <TextBox x:Name="EnvBox" AcceptsReturn="True" TextWrapping="Wrap"
+                     MinHeight="72" MaxHeight="160"
+                     PlaceholderText="PATH=C:\Tools\node&#x0a;ASPNETCORE_ENVIRONMENT=Development"
+                     AutomationProperties.Name="Environment variables" />
+
+            <TextBlock Text="Ready port (optional — Online after TCP listen)" />
+            <TextBox x:Name="ReadyPortBox" PlaceholderText="e.g. 5000"
+                     AutomationProperties.Name="Ready port" />
+            <TextBlock x:Name="ReadyPortError" Classes="errorText" IsVisible="False" />
+
+            <TextBlock Text="Ready file (optional — Online after file exists)" />
+            <TextBox x:Name="ReadyFileBox" PlaceholderText="e.g. C:\app\ready"
+                     AutomationProperties.Name="Ready file" />
+
+            <TextBlock Text="Ready timeout ms (optional)" />
+            <TextBox x:Name="ReadyTimeoutBox" PlaceholderText="30000"
+                     AutomationProperties.Name="Ready timeout" />
+            <TextBlock x:Name="ReadyTimeoutError" Classes="errorText" IsVisible="False" />
+
+            <CheckBox x:Name="WatchBox" Content="Watch files and restart on change" Margin="0 4 0 0" />
+            <TextBlock Text="Watch path (optional — defaults to working directory)" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox x:Name="WatchPathBox" PlaceholderText="e.g. C:\app\src"
+                       AutomationProperties.Name="Watch path" />
+              <Button Grid.Column="1" x:Name="BrowseWatchPathBtn" Content="…" Margin="6 0 0 0"
+                      AutomationProperties.Name="Browse for watch path" />
+            </Grid>
+            <TextBlock Classes="statusMuted" FontSize="11"
+                       Text="Prefer a source folder. node_modules, .git, *.log, and process log paths are ignored." />
+
+            <TextBlock Text="Cron restart (optional — 5-field local time)" />
+            <TextBox x:Name="CronRestartBox" PlaceholderText="e.g. 0 4 * * *"
+                     AutomationProperties.Name="Cron restart" />
+            <TextBlock x:Name="CronRestartError" Classes="errorText" IsVisible="False" />
+
+            <TextBlock Text="Restart delay ms (optional — floor before crash relaunch)" />
+            <TextBox x:Name="RestartDelayBox" PlaceholderText="e.g. 1000"
+                     AutomationProperties.Name="Restart delay" />
+            <TextBlock x:Name="RestartDelayError" Classes="errorText" IsVisible="False" />
+          </StackPanel>
+        </Expander>
 
         <Expander Header="Limits &amp; logging" IsExpanded="False" Margin="0 4 0 0">
           <StackPanel Spacing="10" Margin="0 8 0 0">

@@ -1,10 +1,17 @@
 # Changelog
 
-## 2026-10-22
-- CLI: `nexarun start all` / `start-all` — start every stopped/errored process (progress bar, settle on last only)
-- CLI: `nexarun delete-all` alias (same as `delete all` / `clear-all`)
-- Daemon: `StartAllProcesses` + IPC `start-all`; `StartExisting` honors `SettleAfterStart`
-- Tray: Win32 file dialog fallback when import/export runs from the tray menu with no window; defer actions until the menu dismisses
+## 2026-10-22 — v1.0.13
+- Cron: Vixie OR when both day-of-month and day-of-week are constrained; invalid `cron_restart` rejected on Start/import/ApplyDefinition (no silent clear)
+- Watch: skip restart while Starting/Stopping; clear pending on Stop; ignore `node_modules` / `.git` / `*.log` / configured log paths; prefer `--watch-path` to a source dir
+- Dump import: map `restart_delay` → `RestartDelayMs`, `watch_path` → `WatchPath` (plus existing watch/cron)
+- Tray: Watch / Watch path / Cron restart / Restart delay on Add/Edit (Environment & readiness)
+- CLI: `monit` Ctrl+C exits cleanly (code 0); lifecycle tests for ready timeout/cancel, cron once-per-minute, flush while running, named clones
+- Docs: clones ≠ cluster; reload ≠ ZDT; cron OR; watch ignores; dump vs JSON field notes; instances re-import does not prune old clones
+- Stage 4 carry-forward: `instances` → named clones; `--watch` / `--cron-restart`; `nexarun monit`; [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md)
+- Lifecycle: ready-port/file on crash relaunch; Stop cancels ready wait; Job Objects without kill-on-close
+- Tray: Environment & readiness; Win32 file dialog fallback from tray menu
+- Launch: `--env PATH` for interpreter resolve; CreateProcess-safe quoting; flush locks log sessions
+- JSON/CLI: ready/env/restartDelay; `import --env-name`; `nexarun env`; `list --json`; `start all` / `delete-all`
 
 ## 2026-10-20
 - PM2 import: read apps from dump.pm2 only (no live pm2 jlist); CLI/tray accept dump path; simplify tests and docs

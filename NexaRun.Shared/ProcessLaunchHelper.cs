@@ -17,7 +17,8 @@ public static class ProcessLaunchHelper
             ? Environment.CurrentDirectory
             : workingDirectory;
 
-        var (fileName, mergedArgs) = WrapCmdScriptIfNeeded(executable, arguments, cwd);
+        var pathOverlay = TryGetPathOverlay(environment);
+        var (fileName, mergedArgs) = ResolveLaunchTarget(executable, arguments, cwd, pathOverlay);
 
         var psi = new ProcessStartInfo
         {
@@ -48,8 +49,13 @@ public static class ProcessLaunchHelper
 
     /// <summary>
     /// Resolves an executable on PATH (PATHEXT). Avoids cmd.exe for .exe/.com so child processes stay windowless.
+    /// When <paramref name="pathOverlay"/> is set (e.g. from process <c>PATH</c> env), that value is searched
+    /// instead of the process environment PATH — so LocalSystem can find tools via per-app <c>--env PATH=...</c>.
     /// </summary>
-    public static string ResolveExecutable(string executable, string workingDirectory)
+    public static string ResolveExecutable(
+        string executable,
+        string workingDirectory,
+        string? pathOverlay = null)
     {
         if (string.IsNullOrWhiteSpace(executable))
             return executable;
@@ -66,7 +72,9 @@ public static class ProcessLaunchHelper
             if (File.Exists(combined)) return combined;
         }
 
-        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var pathEnv = !string.IsNullOrWhiteSpace(pathOverlay)
+            ? pathOverlay
+            : Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         var pathext = Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT;.COM";
         var extensions = pathext
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -92,12 +100,17 @@ public static class ProcessLaunchHelper
         return executable;
     }
 
-    private static (string FileName, string Arguments) WrapCmdScriptIfNeeded(
+    /// <summary>
+    /// Maps script paths to an interpreter + args (PM2-style). Already-resolved interpreters
+    /// (node, python, etc.) are left unchanged. Only wraps known script extensions.
+    /// </summary>
+    public static (string FileName, string Arguments) ResolveLaunchTarget(
         string executable,
         string arguments,
-        string workingDirectory)
+        string workingDirectory,
+        string? pathOverlay = null)
     {
-        var resolved = ResolveExecutable(executable, workingDirectory);
+        var resolved = ResolveExecutable(executable, workingDirectory, pathOverlay);
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return (resolved, arguments);
@@ -105,13 +118,99 @@ public static class ProcessLaunchHelper
         if (resolved.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
             resolved.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
         {
-            var cmd = ResolveExecutable("cmd.exe", workingDirectory);
+            var cmd = ResolveExecutable("cmd.exe", workingDirectory, pathOverlay);
             var inner = string.IsNullOrWhiteSpace(arguments)
-                ? $"\"{resolved}\""
-                : $"\"{resolved}\" {arguments}";
+                ? QuoteIfNeeded(resolved)
+                : $"{QuoteIfNeeded(resolved)} {arguments}";
             return (cmd, $"/c {inner}");
         }
 
+        var ext = Path.GetExtension(resolved);
+        if (string.IsNullOrEmpty(ext))
+            return (resolved, arguments);
+
+        if (ext.Equals(".js", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".mjs", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".cjs", StringComparison.OrdinalIgnoreCase))
+        {
+            return WrapWithInterpreter("node", resolved, arguments, workingDirectory, pathOverlay);
+        }
+
+        if (ext.Equals(".py", StringComparison.OrdinalIgnoreCase))
+            return WrapWithInterpreter("python", resolved, arguments, workingDirectory, pathOverlay);
+
+        if (ext.Equals(".ps1", StringComparison.OrdinalIgnoreCase))
+        {
+            var shell = ResolveFirstOnPath(workingDirectory, pathOverlay, "pwsh.exe", "pwsh", "powershell.exe", "powershell");
+            var psArgs = $"-NoProfile -ExecutionPolicy Bypass -File {QuoteIfNeeded(resolved)}";
+            if (!string.IsNullOrWhiteSpace(arguments))
+                psArgs = $"{psArgs} {arguments}";
+            return (shell, psArgs);
+        }
+
+        if (ext.Equals(".dll", StringComparison.OrdinalIgnoreCase))
+            return WrapWithInterpreter("dotnet", resolved, arguments, workingDirectory, pathOverlay);
+
         return (resolved, arguments);
+    }
+
+    private static (string FileName, string Arguments) WrapWithInterpreter(
+        string interpreter,
+        string scriptPath,
+        string arguments,
+        string workingDirectory,
+        string? pathOverlay)
+    {
+        var exe = ResolveExecutable(interpreter, workingDirectory, pathOverlay);
+        var merged = string.IsNullOrWhiteSpace(arguments)
+            ? QuoteIfNeeded(scriptPath)
+            : $"{QuoteIfNeeded(scriptPath)} {arguments}";
+        return (exe, merged);
+    }
+
+    private static string ResolveFirstOnPath(string workingDirectory, string? pathOverlay, params string[] candidates)
+    {
+        foreach (var name in candidates)
+        {
+            var resolved = ResolveExecutable(name, workingDirectory, pathOverlay);
+            if (File.Exists(resolved))
+                return resolved;
+        }
+
+        return ResolveExecutable(candidates[^1], workingDirectory, pathOverlay);
+    }
+
+    private static string? TryGetPathOverlay(IDictionary<string, string>? environment)
+    {
+        if (environment == null) return null;
+        foreach (var (key, value) in environment)
+        {
+            if (key.Equals("PATH", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
+
+    /// <summary>CreateProcess-safe quoting: wrap when needed; double embedded quotes.</summary>
+    public static string QuoteIfNeeded(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+
+        var needsQuotes = false;
+        foreach (var ch in value)
+        {
+            if (ch is ' ' or '\t' or '"')
+            {
+                needsQuotes = true;
+                break;
+            }
+        }
+
+        if (!needsQuotes)
+            return value;
+
+        return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
 }
