@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-22 — v1.0.13
+## 2026-10-22 — v1.0.14
 - Cron: Vixie OR when both day-of-month and day-of-week are constrained; invalid `cron_restart` rejected on Start/import/ApplyDefinition (no silent clear)
 - Watch: skip restart while Starting/Stopping; clear pending on Stop; ignore `node_modules` / `.git` / `*.log` / configured log paths; prefer `--watch-path` to a source dir
 - Dump import: map `restart_delay` → `RestartDelayMs`, `watch_path` → `WatchPath` (plus existing watch/cron)
