@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -28,38 +30,178 @@ public static class NexaRunPaths
     public static string DefaultProcessLogFile(string processName) =>
         Path.Combine(LogDir, $"{processName}.log");
 
+    /// <summary>
+    /// Ensures the data root and log directory exist and carries the secured
+    /// ACL. Safe to call from any context (daemon, tray, CLI, settings store):
+    /// it never throws. When called by a non-owner (the tray or CLI running as
+    /// a regular user) the ACL cannot be set — that is expected and silent; the
+    /// authoritative repair happens on the daemon (LocalSystem) and in the
+    /// installer. See <see cref="ApplyDataSecurity"/>.
+    /// </summary>
     public static void EnsureDirectories()
     {
         Directory.CreateDirectory(DataDir);
         Directory.CreateDirectory(LogDir);
-        TryGrantAuthenticatedUsersModify(DataDir);
-        TryGrantAuthenticatedUsersModify(LogDir);
+        if (System.OperatingSystem.IsWindows())
+            ApplyDataSecurity();
         MigrateLegacyData();
     }
 
-    private static void TryGrantAuthenticatedUsersModify(string path)
+    /// <summary>
+    /// Whether this process can authoritatively set the data-directory ACL —
+    /// i.e. it runs as LocalSystem or an administrator (the contexts where the
+    /// repair is meaningful). Tray/CLI as a plain user return false.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static bool CanApplyDataSecurity()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return;
-        if (!string.IsNullOrEmpty(DataDirOverride))
-            return;
-
+            return false;
         try
         {
-            var dirInfo = new DirectoryInfo(path);
-            var security = dirInfo.GetAccessControl();
-            var sid = new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null);
-            security.AddAccessRule(new FileSystemAccessRule(
-                sid,
-                FileSystemRights.Modify | FileSystemRights.Synchronize,
-                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                PropagationFlags.None,
-                AccessControlType.Allow));
-            dirInfo.SetAccessControl(security);
+            using var id = WindowsIdentity.GetCurrent();
+            return id.Groups!.Any(g => g.Value == WellKnownSidType.LocalSystemSid.ToString()
+                                       || g.Value == WellKnownSidType.BuiltinAdministratorsSid.ToString());
         }
         catch
         {
-            /* non-admin callers may not change ACLs — ignore */
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Applies the NexaRun data-directory security model to the data root and
+    /// its log directory. Callers that can manage ACLs (LocalSystem / admin —
+    /// the daemon and the installer) are expected to invoke this; when it
+    /// cannot be applied the method logs an actionable warning instead of
+    /// throwing, so a startup is never blocked, but the failure is surfaced.
+    ///
+    /// The model is deliberately narrow: LocalSystem (service) and the local
+    /// Administrators group get full control so they can read and write the
+    /// saved process definitions, settings, and application logs. No broader
+    /// group (Authenticated Users, Users, Everybody) is granted access — an
+    /// unprivileged local user must not be able to read secrets or tamper with
+    /// definitions that a privileged daemon later launches. This aligns with
+    /// the System Admin operating model in docs/SERVICE-ACCOUNT.md.
+    ///
+    /// For the optional dedicated-service-account workflow, an administrator
+    /// also grants that account Modify on the data root — documented, not
+    /// auto-detected.
+    /// </summary>
+    /// <returns>true when the DACL was written successfully.</returns>
+    [SupportedOSPlatform("windows")]
+    public static bool ApplyDataSecurity()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return false;
+        if (string.IsNullOrEmpty(DataDirOverride))
+            return true; // test override — do not touch test temp dirs
+
+        var ok = true;
+        foreach (var path in new[] { DataDir, LogDir })
+        {
+            if (SetDirectorySecurity(path))
+                continue;
+
+            ok = false;
+            // Surface the failure so an operator notices the data root may be
+            // left writable by a prior permissive ACL. The daemon logs to its
+            // Serilog file; the tray/CLI have no dedicated log here, so a
+            // best-effort EventLog write keeps it visible.
+            LogDataSecurityWarning(path);
+        }
+
+        return ok;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static bool SetDirectorySecurity(string path)
+    {
+        var dir = new DirectoryInfo(path);
+        var security = dir.GetAccessControl();
+
+        // Start from a known-good DACL: clear any pre-existing permissive ACEs
+        // (e.g. the previous Authenticated-Users Modify grant) that would
+        // otherwise keep applying to existing children.
+        // Use SetAccessRule over each existing ACE with a Deny-type replacement
+        // and then rebuild: the portable .NET DirectorySecurity has no
+        // ResetAccessRules, so enumerate the current rules and drop any ACE
+        // that is not one of our two allowed principals.
+        var allowedSids = new[] {
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null).ToString(),
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null).ToString(),
+        };
+
+        var currentRules = security.GetAccessRules(true, false, typeof(NTAccount))
+            .Cast<FileSystemAccessRule>()
+            .ToList();
+        foreach (var existing in currentRules)
+        {
+            var sid = existing.IdentityReference.Translate(typeof(SecurityIdentifier)).ToString();
+            if (!allowedSids.Contains(sid))
+                security.RemoveAccessRule(existing);
+        }
+
+        var rules = new List<FileSystemAccessRule>
+        {
+            new(
+                new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow),
+            new(
+                new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow),
+        };
+
+        foreach (var rule in rules)
+            security.AddAccessRule(rule);
+
+        try
+        {
+            dir.SetAccessControl(security);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static void LogDataSecurityWarning(string path)
+    {
+        if (!System.OperatingSystem.IsWindows())
+            return;
+
+        const string source = "NexaRun-Tray";
+        var message =
+            $"NexaRun could not apply the data-directory security model to '{path}'. " +
+            "The data root may remain writable by a previously permissive ACL. " +
+            "Run the installer (which applies the ACL as administrator) or set it manually " +
+            "so that only LocalSystem and the Administrators group have access to " +
+            "%ProgramData%\\NexaRun.";
+
+        try
+        {
+            if (!System.Diagnostics.EventLog.SourceExists(source))
+            {
+                // Best effort — creating a source requires admin; ignore if we
+                // cannot.
+                try { System.Diagnostics.EventLog.CreateEventSource(source, "Application"); }
+                catch { /* ignore */ }
+            }
+
+            if (System.Diagnostics.EventLog.SourceExists(source))
+                System.Diagnostics.EventLog.WriteEntry(source, message,
+                    System.Diagnostics.EventLogEntryType.Warning);
+        }
+        catch
+        {
+            /* no EventLog access in this context — already logged to the daemon file log where applicable */
         }
     }
 

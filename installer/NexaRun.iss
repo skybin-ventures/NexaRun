@@ -78,11 +78,12 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\nexarun
 Name: "{group}\NexaRun Tray";        Filename: "{app}\{#TrayExe}";   Comment: "NexaRun system tray app"
 Name: "{group}\Uninstall NexaRun";   Filename: "{uninstallexe}"
 
-; Desktop shortcut (optional task)
-Name: "{autodesktop}\NexaRun";       Filename: "{app}\{#TrayExe}";   Tasks: desktopicon
+; Desktop shortcut (optional task) — elevated: the tray needs admin to reach the daemon
+Name: "{autodesktop}\NexaRun";       Filename: "{app}\{#TrayExe}";   Tasks: desktopicon; Flags: runasadmin
 
 ; Startup (optional task) — {commonstartup} matches admin install (machine-wide service)
-Name: "{commonstartup}\NexaRun Tray"; Filename: "{app}\{#TrayExe}"; Tasks: startwitwindows
+; runasadmin makes Windows launch it with the UAC elevation verb at every user's logon
+Name: "{commonstartup}\NexaRun Tray"; Filename: "{app}\{#TrayExe}"; Tasks: startwitwindows; Flags: runasadmin
 
 [Run]
 ; Install and start the Windows Service silently after install
@@ -102,6 +103,40 @@ Filename: "powershell.exe"; \
 Filename: "{app}\{#TrayExe}"; \
   Description: "Launch NexaRun Tray"; \
   Flags: runhidden nowait postinstall skipifsilent
+
+; Ensure the data root exists before securing it (icacls is a no-op on a
+; missing path — the daemon will create it on first run, but a fresh install
+; has no prior data dir yet).
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""New-Item -ItemType Directory -Path ''%ProgramData%\NexaRun'' -Force | Out-Null"""; \
+  Flags: runhidden nowait; StatusMsg: "Preparing %ProgramData%\NexaRun ..."
+
+; Secure the data root (%ProgramData%\NexaRun) so only LocalSystem and
+; Administrators have access. This is the installer-time equivalent of the
+; daemon's ApplyDataSecurity() (NexaRun.Shared/NexaRunPaths.cs), which also
+; runs at daemon startup as LocalSystem and strips stale permissive ACEs on
+; every boot. The icacls commands below:
+;   1. Set the owner to LocalSystem so the service can always reset/repair
+;      its own DACL even if a previous install left it owned by a user.
+;   2. Grant LocalSystem and the built-in Administrators group full control
+;      with object + container inheritance (OI)(CI). No other principal
+;      (Authenticated Users, Users, World, etc.) is granted — so secrets in
+;      processes.json / settings.json and the log files under logs\ are
+;      only readable/writable by a privileged principal.
+; /c continues on per-file errors, /q suppresses output; both are runhidden.
+;
+; Inno's [Run] cannot carry multiple /grant* arguments in one icacls call
+; (Inno flattens the parameter string), so the two grants run as separate
+; [Run] entries against the same path.
+Filename: "icacls.exe"; \
+  Parameters: """%ProgramData%\NexaRun"" /setowner:""NT AUTHORITY\System"" /c /q"; \
+  Flags: runhidden nowait; StatusMsg: "Securing %ProgramData%\NexaRun (owner: LocalSystem)..."
+Filename: "icacls.exe"; \
+  Parameters: """%ProgramData%\NexaRun"" /grant*:""NT AUTHORITY\SYSTEM:(OI)(CI)(F)"" /c /q"; \
+  Flags: runhidden nowait; StatusMsg: "Securing %ProgramData%\NexaRun (LocalSystem full control)..."
+Filename: "icacls.exe"; \
+  Parameters: """%ProgramData%\NexaRun"" /grant*:""BUILTIN\Administrators:(OI)(CI)(F)"" /c /q"; \
+  Flags: runhidden nowait; StatusMsg: "Securing %ProgramData%\NexaRun (Administrators full control)..."
 
 ; Ensure system PATH + broadcast (fixes upgrades that predate PATH logic)
 Filename: "powershell.exe"; \

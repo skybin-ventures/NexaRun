@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-24
+- Security: named pipe ACL restricted to LocalSystem + Administrators (World/Authenticated-Users dropped); handler-side client-identity check now impersonates the connected pipe client via `ImpersonateNamedPipeClient` + `RevertImpersonation` (fail-closed), replacing the earlier server-identity check that always saw the daemon's own LocalSystem token
+- Security: `daemon-info` remains the sole unprivileged health probe — all other IPC commands require a privileged client; a `daemon-info` response carries no process data / settings / logs / env (covered by regression test)
+- Data directory ACL: `%ProgramData%\NexaRun` + `logs\` secured to LocalSystem (FullControl) and Builtin Administrators (FullControl) with `(OI)(CI)` inheritance; stale permissive ACEs (Authenticated Users, Users, World) are removed on every daemon boot via `NexaRunPaths.ApplyDataSecurity()`, and the installer applies the same model at install/upgrade time via `icacls`
+- Tray elevation: `NexaRun.Tray/app.manifest` switched from `asInvoker` to `requireAdministrator`; Inno installer all-users Startup and desktop tray shortcuts now use `Flags: runasadmin` so the tray starts elevated at every user's logon; user docs (README, CLI-GUIDE, `docs/SERVICE-ACCOUNT.md`) updated to state that the tray/CLI must run elevated to reach the admin-only daemon
+- Watch: regression coverage preserved for relative `WatchPath` → process `WorkingDirectory` resolution and for log-file-only exclusions (no parent-directory exclusion; rotated `.1`–`.3` generations ignored)
+- Tests: new `IpcServerSecurityTests` (pipe ACL principal set, `daemon-info` payload, fail-closed `IsPrivilegedClient`, privilege gate) and `DataSecurityTests` (ACL grants LocalSystem + Administrators only, removes stale permissive ACEs); full suite 82/82 passing
+
 ## 2026-10-22 — v1.0.14
 - Cron: Vixie OR when both day-of-month and day-of-week are constrained; invalid `cron_restart` rejected on Start/import/ApplyDefinition (no silent clear)
 - Watch: skip restart while Starting/Stopping; clear pending on Stop; ignore `node_modules` / `.git` / `*.log` / configured log paths; prefer `--watch-path` to a source dir

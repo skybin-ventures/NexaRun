@@ -137,7 +137,7 @@ public sealed class ProcessWatchService : IDisposable
         return false;
     }
 
-    private static HashSet<string> BuildIgnorePaths(NexaProcess p)
+    public static HashSet<string> BuildIgnorePaths(NexaProcess p)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in new[] { p.LogFile, p.OutLogFile, p.ErrorLogFile })
@@ -146,15 +146,30 @@ public sealed class ProcessWatchService : IDisposable
             try
             {
                 var full = Path.GetFullPath(path);
-                set.Add(full);
-                var dir = Path.GetDirectoryName(full);
-                if (!string.IsNullOrWhiteSpace(dir))
-                    set.Add(dir);
+                AddLogFileIgnores(set, full);
             }
             catch { /* ignore bad paths */ }
         }
 
         return set;
+    }
+
+    /// <summary>
+    /// Adds a configured log file and its rotated generations (.1 … .N) to the
+    /// ignore set without excluding the log file's parent directory. Excluding
+    /// the parent would suppress the whole watched tree when a log sits
+    /// directly under the watch root. Rotated files matter because
+    /// <c>LogFileHelper.RotateGenerations</c> renames the live log to
+    /// <c>.1</c> on rotation; without ignoring those, a rotation would trigger
+    /// a restart loop. The generic <c>.log</c> rule in <see cref="ShouldIgnore"/>
+    /// already covers the live file, so these additions are a belt-and-suspenders
+    /// guarantee plus coverage for rotated names.
+    /// </summary>
+    private static void AddLogFileIgnores(HashSet<string> set, string full)
+    {
+        set.Add(full);
+        for (var i = 1; i <= ProcessDefaults.MaxLogGenerations; i++)
+            set.Add($"{full}.{i}");
     }
 
     private void Remove(int id)
@@ -172,12 +187,27 @@ public sealed class ProcessWatchService : IDisposable
         _pending.TryRemove(id, out _);
     }
 
-    private static string? ResolveWatchPath(NexaProcess p)
+    public static string? ResolveWatchPath(NexaProcess p)
     {
+        // An absolute WatchPath is used as-is.
         if (!string.IsNullOrWhiteSpace(p.WatchPath))
-            return Path.GetFullPath(p.WatchPath);
+        {
+            if (Path.IsPathRooted(p.WatchPath))
+                return Path.GetFullPath(p.WatchPath);
+
+            // A relative WatchPath resolves against the process WorkingDirectory,
+            // never the daemon's current directory. With a blank working
+            // directory the relative path cannot be resolved to a stable
+            // location, so the watch is skipped (Sync logs a warning).
+            if (string.IsNullOrWhiteSpace(p.WorkingDirectory))
+                return null;
+            return Path.GetFullPath(Path.Combine(p.WorkingDirectory, p.WatchPath));
+        }
+
+        // No WatchPath set: watch the WorkingDirectory when present, else skip.
         if (!string.IsNullOrWhiteSpace(p.WorkingDirectory))
             return Path.GetFullPath(p.WorkingDirectory);
+
         return null;
     }
 

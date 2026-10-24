@@ -14,6 +14,8 @@ The installer will:
 - Install the **NexaRun Daemon** as a Windows Service that starts automatically with Windows
 - Copy the CLI to `C:\Program Files\NexaRun\bin\nexarun.exe` and append that folder to the **system PATH**
 - Launch the **NexaRun tray app** so you can start managing processes immediately
+- Optionally create an all-users Startup shortcut that launches the tray **elevated** (UAC prompt at every user's logon) — the tray runs as admin by design, because the daemon pipe is reachable only by LocalSystem and Administrators
+- Secure `%ProgramData%\NexaRun` to **LocalSystem + Administrators only** (the legacy Authenticated-Users write ACE is removed on install and on every daemon boot)
 - Ship a sample `nexarun-processes.json` for JSON import
 
 After install, **open a new Command Prompt or PowerShell window** (existing terminals do not pick up PATH until restarted). Then run:
@@ -407,7 +409,7 @@ User **stop** cancels any pending crash-restart backoff and ready wait. Stop tri
 
 If you set a **per-process** CPU or memory limit, NexaRun restarts that process when it exceeds its own limit (not a total across all apps). If it cannot recover, status becomes **Errored** with a reason in the Processes/Dashboard UI, `nexarun list`, and the process log.
 
-In **Settings**, configure failed-process recovery (default every **10 minutes**, minimum 10) and optional **AWS SES email alerts** when a process goes from Online to Errored. Credentials are stored in `%ProgramData%\NexaRun\settings.json` (restrict ACLs on shared machines).
+In **Settings**, configure failed-process recovery (default every **10 minutes**, minimum 10) and optional **AWS SES email alerts** when a process goes from Online to Errored. Credentials are stored in `%ProgramData%\NexaRun\settings.json`, which is secured to **LocalSystem + Administrators only** — no broad authenticated-user write access. An unprivileged local user cannot read the saved AWS/SNS credentials or alter saved process definitions; see [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md#data-directory-security-model).
 
 When recovery is enabled, the daemon tries **one** start for each **Errored** process per interval (crash restart counter resets for that attempt).
 

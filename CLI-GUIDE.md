@@ -79,7 +79,7 @@ Resolution order:
 | `--ready-file <path>` | Wait until file exists before Online (also after crash relaunch) |
 | `--ready-timeout <ms>` | Ready-check timeout (default **30000**) |
 | `--restart-delay <ms>` | Minimum crash-restart delay (actual = max(exponential backoff, this)) |
-| `--watch` / `--watch-path` | Restart when files change (default path: cwd). Prefer a source folder; ignores `node_modules`, `.git`, `*.log`, and process log paths |
+| `--watch` / `--watch-path` | Restart when files change (default path: cwd). Prefer a source folder; ignores `node_modules`, `.git`, `*.log`, and configured log files (+ their rotated `.1`–`.3`). A relative `--watch-path` resolves against `--cwd`; if `--cwd` is blank it is skipped (a warning is logged) |
 | `--cron-restart "m h dom mon dow"` | Scheduled restart (5-field cron, local time). When both day-of-month and day-of-week are set (neither `*`), either may match (Vixie OR) |
 
 Script paths (`.js`, `.py`, `.ps1`, `.dll`, `.cmd`/`.bat`) are wrapped with the usual interpreter under the daemon (`node`, `python`, `pwsh`/`powershell`, `dotnet`, `cmd`). Prefer absolute interpreter paths or `--env PATH=...` when the LocalSystem PATH is incomplete.
@@ -256,7 +256,13 @@ Optional dedicated **service** account (admin-owned only): [docs/SERVICE-ACCOUNT
 
 Tray **Add/Edit Process → Environment & readiness** also covers watch, watch path, cron restart, and restart delay (same fields as CLI/JSON).
 
-Data lives under `%ProgramData%\NexaRun` (shared by daemon, CLI, and tray). Restrict ACLs on shared machines if you store secrets in `processes.json` / `settings.json`.
+Data lives under `%ProgramData%\NexaRun` (shared by daemon, CLI, and tray). The data root is secured to **LocalSystem + Administrators only** (the daemon's `NexaRunPaths.ApplyDataSecurity()` and the installer strip the legacy permissive Authenticated-Users ACE on every boot/install). See [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md#data-directory-security-model).
+
+### Elevation / who can reach the daemon
+
+The daemon pipe is granted only to **LocalSystem** and the **Administrators** group, and every process-management / secret-reading command (`start`, `stop`, `delete`, `list`, `describe`, `env`, `save`, `set-settings`, …) is additionally verified in the handler by **impersonating the connected pipe client** (`ImpersonateNamedPipeClient`) and checking that client's token for Administrators/LocalSystem membership. Run the CLI or tray **elevated** (or as LocalSystem) to drive the daemon. The one carve-out is `nexarun daemon status`, which uses the `daemon-info` health probe and so works without elevation — it only reports reachability and the data directory and exposes no process data or secrets.
+
+The tray app (`NexaRun.exe`) ships with a **requireAdministrator** manifest, so it always prompts UAC on launch. The Inno installer creates the all-users **Startup** and desktop shortcuts with the UAC `runasadmin` verb so the tray starts elevated automatically at each user's logon. Details: [docs/SERVICE-ACCOUNT.md](docs/SERVICE-ACCOUNT.md).
 
 ---
 

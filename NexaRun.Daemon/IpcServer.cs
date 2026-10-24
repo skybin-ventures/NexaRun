@@ -1,4 +1,6 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
@@ -40,17 +42,6 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
                 PipeOptions.Asynchronous);
         }
 
-        // Allow interactive users to connect when the daemon runs as LocalSystem.
-        var security = new PipeSecurity();
-        security.AddAccessRule(new PipeAccessRule(
-            new SecurityIdentifier(WellKnownSidType.WorldSid, null),
-            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
-            AccessControlType.Allow));
-        security.AddAccessRule(new PipeAccessRule(
-            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
-            PipeAccessRights.FullControl,
-            AccessControlType.Allow));
-
         return NamedPipeServerStreamAcl.Create(
             PipeConstants.PipeName,
             PipeDirection.InOut,
@@ -59,8 +50,102 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
             PipeOptions.Asynchronous,
             inBufferSize: 0,
             outBufferSize: 0,
-            pipeSecurity: security);
+            pipeSecurity: BuildPipeSecurity());
     }
+
+    /// <summary>
+    /// Build the pipe's PipeSecurity descriptor. The daemon runs as LocalSystem
+    /// and exposes process-management and saved-secret (env) operations, so
+    /// the pipe is granted only to LocalSystem (full control) and the local
+    /// Administrators group (read/write + create new instance). No unprivileged
+    /// principal (World, Authenticated Users, Users) is granted access. This is
+    /// the primary access boundary; see docs/SERVICE-ACCOUNT.md.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static PipeSecurity BuildPipeSecurity()
+    {
+        var security = new PipeSecurity();
+        security.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            PipeAccessRights.FullControl,
+            AccessControlType.Allow));
+        security.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+            AccessControlType.Allow));
+        return security;
+    }
+
+    /// <summary>
+    /// The single security gate: which commands a caller may run given whether
+    /// the caller is privileged. Everything that touches process state, saved
+    /// settings, logs, or environment is privileged-only; <c>daemon-info</c>
+    /// is the only exception (the health probe used by <c>nexarun daemon
+    /// status</c> — it returns reachability and the data directory, no process
+    /// data or secrets).
+    /// </summary>
+    public static IpcResponse? CheckPrivilege(IpcRequest request, bool privileged)
+    {
+        if (privileged || request.Command == "daemon-info")
+            return null; // allowed — continue to the command handler
+
+        return new IpcResponse
+        {
+            Success = false,
+            Message = "Access denied. NexaRun is a machine-wide System Admin service; run the CLI/tray elevated or connect as LocalSystem."
+        };
+    }
+
+    /// <summary>
+    /// Confirm the connected PIPE CLIENT is privileged (LocalSystem or a member
+    /// of Administrators). This is defense in depth on top of the pipe ACL,
+    /// which remains the primary access boundary.
+    ///
+    /// Impersonates the connected client via <c>ImpersonateNamedPipeClient</c>
+    /// (advapi32.dll) so that <see cref="WindowsIdentity.GetCurrent"/> returns
+    /// the client's token rather than the daemon's own LocalSystem token.
+    /// <c>RevertImpersonation</c> (advapi32.dll) restores the daemon token in
+    /// a finally block. Every failure path is fail-closed: any error returns
+    /// <c>false</c> so privileged commands are denied rather than downgraded.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static bool IsPrivilegedClient(NamedPipeServerStream pipe)
+    {
+        if (!OperatingSystem.IsWindows())
+            return true;
+
+        var handle = pipe.SafePipeHandle.DangerousGetHandle();
+        if (handle == IntPtr.Zero)
+            return false;
+
+        if (!ImpersonateNamedPipeClient(handle))
+            return false;
+
+        try
+        {
+            using var client = WindowsIdentity.GetCurrent();
+            return IsPrivilegedGroups(client.Groups!);
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            RevertImpersonation();
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static bool IsPrivilegedGroups(IEnumerable<IdentityReference> groups) =>
+        groups.Any(g => g.Value == WellKnownSidType.BuiltinAdministratorsSid.ToString()
+                       || g.Value == WellKnownSidType.LocalSystemSid.ToString());
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool ImpersonateNamedPipeClient(IntPtr hNamedPipe);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool RevertImpersonation();
 
     private async Task HandleConnection(NamedPipeServerStream pipe, CancellationToken ct)
     {
@@ -76,6 +161,23 @@ public class IpcServer(ProcessManager processManager, ILogger<IpcServer> logger)
 
                 var request = JsonSerializer.Deserialize<IpcRequest>(line);
                 if (request == null) return;
+
+                // Non-Windows dev builds have no named-pipe ACL, so the privilege
+                // gate is a no-op there; on Windows every command except the
+                // daemon-info health probe requires a privileged client. We
+                // impersonate the connected client so the check reflects the
+                // CLIENT's identity, not the daemon's own LocalSystem token.
+                var privileged = OperatingSystem.IsWindows() ? IsPrivilegedClient(pipe) : true;
+                var denied = IpcServer.CheckPrivilege(request, privileged);
+                if (denied != null)
+                {
+                    logger.LogWarning(
+                        "IPC request for '{Command}' rejected: caller lacks local admin / LocalSystem access",
+                        request.Command);
+                    var deniedJson = JsonSerializer.Serialize(denied);
+                    await writer.WriteLineAsync(deniedJson.AsMemory(), ct);
+                    return;
+                }
 
                 var response = await Dispatch(request);
                 var responseJson = JsonSerializer.Serialize(response);
